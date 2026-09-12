@@ -198,8 +198,7 @@ The included workflow publishes only `site/`.
 1. Push the private customized repository to GitHub.
 2. Open **Settings → Pages**.
 3. Set **Source** to **GitHub Actions**.
-4. Run the “Deploy frontend to GitHub Pages” workflow or push a change under
-   `site/`.
+4. Run the “Deploy frontend to GitHub Pages” workflow.
 5. Add the resulting origin to `ALLOWED_ORIGINS`, update `PUBLIC_RSVP_URL`, and
    redeploy the Worker.
 
