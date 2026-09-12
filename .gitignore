@@ -1,0 +1,19 @@
+node_modules/
+.wrangler/
+.dev.vars
+.env
+*.log
+.DS_Store
+
+# Guest PII and one-time generated RSVP credentials
+scripts/guests.csv
+scripts/import.csv
+scripts/sms.csv
+scripts/seed.sql
+scripts/*.private.csv
+scripts/.env
+
+# Local build and preview output
+_site/
+.cache/
+dist/

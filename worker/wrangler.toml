@@ -1,0 +1,15 @@
+name = "your-wedding-rsvp"
+main = "src/index.ts"
+compatibility_date = "2026-09-12"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "your-wedding-rsvp"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+[vars]
+ALLOWED_ORIGINS = "https://YOURUSERNAME.github.io,http://localhost:5050"
+WEDDING_DATE = "2027-09-18"
+
+# Set the dashboard credential separately; never place it in this file:
+# npx wrangler secret put DASHBOARD_PIN

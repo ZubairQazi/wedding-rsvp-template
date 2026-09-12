@@ -1,0 +1,1534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RSVP Dashboard</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: Inter, system-ui, sans-serif;
+      background: #f5f0e8;
+      color: #2a2a2a;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+
+    h1 {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-size: 2rem;
+      font-weight: 600;
+      color: #5a3e2b;
+      margin-bottom: 2rem;
+      letter-spacing: 0.02em;
+    }
+
+    /* ── PIN screen ── */
+    #pin-screen {
+      background: #fff;
+      border-radius: 12px;
+      padding: 2.5rem 2rem;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+      width: 100%;
+      max-width: 360px;
+      text-align: center;
+    }
+    #pin-screen label {
+      display: block;
+      font-size: 0.9rem;
+      font-weight: 500;
+      margin-bottom: 0.75rem;
+      color: #555;
+    }
+    #pin-input {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      font-size: 1.1rem;
+      border: 1.5px solid #d4c4b0;
+      border-radius: 8px;
+      text-align: center;
+      letter-spacing: 0.2em;
+      outline: none;
+      transition: border-color 0.2s;
+      margin-bottom: 1rem;
+    }
+    #pin-input:focus { border-color: #8b6f4e; }
+    #pin-error { color: #c0392b; font-size: 0.85rem; min-height: 1.2rem; margin-bottom: 0.75rem; }
+    #pin-btn {
+      width: 100%;
+      padding: 0.75rem;
+      background: #8b6f4e;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    #pin-btn:hover { background: #7a5f40; }
+    #pin-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    /* ── Dashboard ── */
+    #dashboard { display: none; width: 100%; max-width: 1100px; }
+
+    .stats {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 1.5rem;
+    }
+    .stat-card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 1rem 1.5rem;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+      flex: 1;
+      min-width: 130px;
+      text-align: center;
+    }
+    .stat-card { cursor: default; }
+    .stat-card.clickable { cursor: pointer; transition: box-shadow 0.15s, transform 0.15s; }
+    .stat-card.clickable:hover { box-shadow: 0 4px 18px rgba(0,0,0,0.13); transform: translateY(-1px); }
+    .stat-card .num { font-size: 2rem; font-weight: 700; color: #8b6f4e; }
+    .stat-card .num.green { color: #27ae60; }
+    .stat-card .num.amber { color: #e67e22; }
+    .stat-card .lbl { font-size: 0.78rem; color: #777; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 0.2rem; }
+    .stat-card .sub { font-size: 0.72rem; color: #aaa; margin-top: 0.15rem; }
+
+    .controls {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .controls input, .controls select {
+      padding: 0.5rem 0.75rem;
+      border: 1.5px solid #d4c4b0;
+      border-radius: 7px;
+      font-size: 0.9rem;
+      outline: none;
+    }
+    .controls input:focus, .controls select:focus { border-color: #8b6f4e; }
+    .controls label { font-size: 0.85rem; color: #555; }
+    #export-btn {
+      margin-left: auto;
+      padding: 0.5rem 1.2rem;
+      background: #8b6f4e;
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    #export-btn:hover { background: #7a5f40; }
+
+    .table-wrap {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 14px rgba(0,0,0,0.08);
+      overflow-x: auto;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    thead th {
+      background: #f0e8db;
+      padding: 0.75rem 1rem;
+      text-align: left;
+      font-weight: 600;
+      color: #5a3e2b;
+      white-space: nowrap;
+      border-bottom: 2px solid #ddd0bf;
+      cursor: pointer;
+      user-select: none;
+    }
+    thead th:hover { background: #e8ddd0; }
+    thead th.sorted-asc::after { content: ' ↑'; }
+    thead th.sorted-desc::after { content: ' ↓'; }
+    tbody tr { border-bottom: 1px solid #f0ebe3; }
+    tbody tr:hover { background: #faf6f0; }
+    tbody tr.group-start td { border-top: 2px solid #ddd0bf; }
+    tbody tr:first-child td { border-top: none; }
+    td { padding: 0.65rem 1rem; vertical-align: middle; }
+    td.attending-yes { color: #27ae60; font-weight: 600; }
+    td.attending-no  { color: #c0392b; font-weight: 600; }
+    td.attending-pending { color: #aaa; font-style: italic; }
+    .household-cell { font-weight: 500; }
+    .household-cell.continued { font-weight: 400; color: #bbb; padding-left: 1.5rem; font-size: 0.78rem; }
+    .tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin: 1px;
+    }
+    .tag-welcome  { background: #fde8f5; color: #8b2fa8; }
+    .tag-ceremony { background: #fde8e8; color: #c0392b; }
+    .tag-farewell { background: #e8f5fd; color: #2369a4; }
+    .source-a { background: #e8f5e9; color: #2e7d32; }
+    .source-b { background: #fff3e0; color: #e65100; }
+    .source-mixed { background: #e8eaf6; color: #283593; }
+    .updated { font-size: 0.78rem; color: #999; }
+    #loading { color: #888; margin: 2rem 0; }
+
+    /* ── Inline edit toggles ── */
+    .toggle-group { display: flex; gap: 4px; flex-wrap: nowrap; }
+    .toggle-btn {
+      padding: 3px 9px;
+      border-radius: 12px;
+      border: 1.5px solid #d4c4b0;
+      background: transparent;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      opacity: 0.5;
+      transition: opacity 0.15s, background 0.15s, border-color 0.15s;
+      white-space: nowrap;
+    }
+    .toggle-btn:hover { opacity: 0.85; }
+    .toggle-btn.active { opacity: 1; }
+    .toggle-btn.yes.active  { background: #d4f5e2; border-color: #27ae60; color: #1a8048; }
+    .toggle-btn.no.active   { background: #fce8e8; border-color: #c0392b; color: #922b21; }
+    .toggle-btn.pend.active { background: #f0ebe3; border-color: #aaa;    color: #666; }
+    .toggle-btn.saving { animation: pulse 0.8s infinite alternate; }
+    @keyframes pulse { from { opacity: 0.4; } to { opacity: 1; } }
+
+    /* ── Per-event response rows ── */
+    .event-response-row { display: flex; align-items: center; gap: 0.5rem; margin: 2px 0; }
+    .event-response-row .event-label {
+      display: inline-block; width: 56px; font-size: 0.75rem; font-weight: 600;
+    }
+    .event-label.welcome { color: #8b2fa8; }
+    .event-label.ceremony { color: #c0392b; }
+    .event-label.farewell { color: #2369a4; }
+
+    /* ── Chip-based event filter ── */
+    .chip-filter { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+    .chip-filter-label { font-size: 0.82rem; color: #777; white-space: nowrap; }
+    .event-chip-btn {
+      padding: 3px 10px;
+      border-radius: 20px;
+      border: 1.5px solid #d4c4b0;
+      background: #fff;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .event-chip-btn:hover { border-color: #8b6f4e; }
+    .event-chip-btn.active-welcome { background: #fde8f5; border-color: #8b2fa8; color: #8b2fa8; }
+    .event-chip-btn.active-ceremony { background: #fde8e8; border-color: #c0392b; color: #c0392b; }
+    .event-chip-btn.active-farewell { background: #e8f5fd; border-color: #2369a4; color: #2369a4; }
+
+    /* ── Guest management ── */
+    .action-btns { display: flex; gap: 4px; align-items: center; }
+    .action-btn {
+      background: none; border: 1px solid #ddd; border-radius: 4px;
+      cursor: pointer; padding: 2px 6px; font-size: 0.75rem; color: #888;
+      transition: all 0.15s;
+    }
+    .action-btn:hover { border-color: #8b6f4e; color: #5a3e2b; }
+    .action-btn.del:hover { border-color: #c0392b; color: #c0392b; }
+    .add-guest-btn {
+      background: none; border: 1px dashed #bbb; border-radius: 4px;
+      cursor: pointer; padding: 1px 7px; font-size: 0.8rem; color: #999;
+      margin-left: 8px; transition: all 0.15s;
+    }
+    .add-guest-btn:hover { border-color: #2e7d32; color: #2e7d32; }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+      z-index: 1000; align-items: flex-start; justify-content: center;
+      overflow-y: auto; padding: 2rem 1rem;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: #fff; border-radius: 12px; padding: 2rem; width: 100%;
+      max-width: 420px; box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+      margin: auto 0;
+    }
+    .modal h2 {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-size: 1.4rem; color: #5a3e2b; margin-bottom: 1.25rem;
+    }
+    .modal .field { margin-bottom: 1rem; }
+    .modal label { display: block; font-size: 0.8rem; font-weight: 500; color: #666; margin-bottom: 4px; }
+    .modal input[type="text"] {
+      width: 100%; padding: 0.5rem 0.75rem; font-size: 0.9rem;
+      border: 1px solid #ccc; border-radius: 6px;
+    }
+    .modal input[type="text"]:read-only { background: #f5f5f5; color: #888; }
+    .modal select {
+      padding: 0.5rem 0.75rem; font-size: 0.9rem;
+      border: 1px solid #ccc; border-radius: 6px; cursor: pointer;
+    }
+    .modal #modal-source { font-weight: 600; }
+    .modal #modal-source.src-A { background: #e8f5e9; color: #2e7d32; border-color: #2e7d32; }
+    .modal #modal-source.src-B { background: #fff3e0; color: #e65100; border-color: #e65100; }
+    .modal .evt-row {
+      display: flex; align-items: center; gap: 10px; padding: 7px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .modal .evt-row:last-child { border-bottom: none; }
+    .modal .evt-row label.evt-name {
+      display: flex; align-items: center; gap: 6px; font-size: 0.9rem;
+      font-weight: 400; color: #333; min-width: 100px; margin: 0;
+    }
+    .modal .evt-row label.evt-name input[type="checkbox"] { display: none; }
+    .modal .evt-pill {
+      display: inline-block; padding: 3px 12px; border-radius: 12px; font-size: 0.8rem;
+      font-weight: 600; cursor: pointer; border: 2px solid transparent;
+      opacity: 0.4; transition: all 0.15s; user-select: none;
+    }
+    .modal .evt-pill.checked { opacity: 1; }
+    .modal .evt-pill.pill-welcome { background: #fde8f5; color: #8b2fa8; border-color: #8b2fa8; }
+    .modal .evt-pill.pill-ceremony { background: #fde8e8; color: #c0392b; border-color: #c0392b; }
+    .modal .evt-pill.pill-farewell { background: #e8f5fd; color: #2369a4; border-color: #2369a4; }
+    .modal .ib-select {
+      font-size: 0.8rem; padding: 2px 6px; border-radius: 4px;
+      font-weight: 600; border: 1px solid #ccc; cursor: pointer;
+    }
+    .modal .ib-select.ib-Q { background: #e8f5e9; color: #2e7d32; border-color: #2e7d32; }
+    .modal .ib-select.ib-U { background: #fff3e0; color: #e65100; border-color: #e65100; }
+    .modal .btn-row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1.5rem; }
+    .modal .btn-primary {
+      background: #5a3e2b; color: #fff; border: none; border-radius: 6px;
+      padding: 0.5rem 1.25rem; font-size: 0.9rem; cursor: pointer;
+    }
+    .modal .btn-primary:hover { background: #7a5a40; }
+    .modal .btn-secondary {
+      background: #eee; color: #555; border: none; border-radius: 6px;
+      padding: 0.5rem 1.25rem; font-size: 0.9rem; cursor: pointer;
+    }
+    .modal .btn-secondary:hover { background: #ddd; }
+    .modal .guest-entry {
+      border: 1px solid #e8e0d4; border-radius: 8px; padding: 0.75rem;
+      margin-bottom: 0.75rem; position: relative; background: #faf8f4;
+    }
+    .modal .guest-entry .remove-guest-entry {
+      position: absolute; top: 6px; right: 8px; background: none; border: none;
+      color: #ccc; font-size: 1rem; cursor: pointer; padding: 2px 6px;
+    }
+    .modal .guest-entry .remove-guest-entry:hover { color: #c0392b; }
+    .modal .result-box {
+      margin-top: 1rem; padding: 1rem; background: #f0f8e8; border: 1px solid #c5e1a5;
+      border-radius: 8px; word-break: break-all; text-align: center;
+    }
+    .modal .result-box .result-label {
+      font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em;
+      color: #666; margin-bottom: 4px;
+    }
+    .modal .result-box .result-code {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-size: 1.8rem; font-weight: 600; color: #2e7d32; letter-spacing: 0.15em;
+      margin-bottom: 8px;
+    }
+    .modal .result-box .result-link {
+      font-size: 0.8rem; color: #5a3e2b; word-break: break-all;
+    }
+    .modal .result-box .result-link a { color: #5a3e2b; }
+    .modal .result-box .result-link a:hover { color: #8b6f4e; }
+    .modal .result-warning {
+      font-size: 0.75rem; color: #999; font-style: italic; margin-top: 8px;
+    }
+    .modal .result-sms {
+      margin-top: 12px; padding: 10px; background: #faf8f4; border: 1px solid #e8e0d4;
+      border-radius: 6px; font-size: 0.8rem; color: #444; white-space: pre-wrap;
+      text-align: left; line-height: 1.5; position: relative;
+    }
+    .modal .result-sms-label {
+      font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em;
+      color: #999; margin-bottom: 4px;
+    }
+    .modal .copy-btn {
+      position: absolute; top: 6px; right: 6px; background: #eee; border: 1px solid #ccc;
+      border-radius: 4px; padding: 2px 8px; font-size: 0.7rem; cursor: pointer; color: #666;
+    }
+    .modal .copy-btn:hover { background: #ddd; }
+  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<h1>RSVP Dashboard</h1>
+
+<!-- PIN Gate -->
+<div id="pin-screen">
+  <label for="pin-input">Enter PIN to continue</label>
+  <input type="password" id="pin-input" placeholder="••••••" autocomplete="current-password">
+  <div id="pin-error"></div>
+  <button id="pin-btn">Unlock</button>
+</div>
+
+<!-- Dashboard (hidden until authenticated) -->
+<div id="dashboard">
+  <p id="loading">Loading RSVPs…</p>
+
+  <div class="stats" id="stats" style="display:none"></div>
+
+  <div class="controls" id="controls" style="display:none">
+    <input type="search" id="search" placeholder="Search guest or household…" style="min-width:220px">
+    <div class="chip-filter">
+      <span class="chip-filter-label">Invited To:</span>
+      <button class="event-chip-btn" data-event="welcome">Welcome</button>
+      <button class="event-chip-btn" data-event="ceremony">Ceremony</button>
+      <button class="event-chip-btn" data-event="farewell">Farewell</button>
+    </div>
+    <select id="filter-attending">
+      <option value="">All Responses</option>
+      <option value="yes">Attending</option>
+      <option value="no">Not Attending</option>
+      <option value="pending">Pending</option>
+    </select>
+    <select id="filter-source">
+      <option value="">All Sources</option>
+    </select>
+    <button id="export-btn">Export CSV</button>
+    <button id="new-household-btn" style="background:#2e7d32;color:#fff;border:none;border-radius:6px;padding:0.5rem 1rem;font-size:0.85rem;cursor:pointer">+ New Household</button>
+  </div>
+
+  <div class="table-wrap" id="table-wrap" style="display:none">
+    <table id="rsvp-table">
+      <thead>
+        <tr>
+          <th data-col="household_label">Household</th>
+          <th data-col="full_name">Guest</th>
+          <th data-col="invited_events">Invited To</th>
+          <th>Response</th>
+          <th data-col="updated_at">Updated</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="rsvp-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Regenerate Token Modal -->
+<div class="modal-overlay" id="regen-modal" style="z-index:1100">
+  <div class="modal">
+    <h2 id="regen-title">RSVP Link</h2>
+    <p style="font-size:0.85rem;color:#888;margin-bottom:1rem">This will generate a new RSVP code. Any previously shared link will stop working.</p>
+    <div id="regen-result" class="result-box" style="display:none"></div>
+    <div class="btn-row">
+      <button class="btn-secondary" id="regen-close" style="display:none">Close</button>
+      <button class="btn-primary" id="regen-confirm">Regenerate Code</button>
+    </div>
+  </div>
+</div>
+
+<!-- Duplicate Confirmation Modal -->
+<div class="modal-overlay" id="dupe-modal" style="z-index:1100">
+  <div class="modal">
+    <h2 style="color:#e65100">Household Already Exists</h2>
+    <p id="dupe-msg" style="font-size:0.9rem;color:#555;margin-bottom:0.75rem"></p>
+    <div id="dupe-existing" style="background:#faf8f4;border:1px solid #e8e0d4;border-radius:8px;padding:0.75rem;margin-bottom:1rem;font-size:0.85rem"></div>
+    <p style="font-size:0.85rem;color:#888;margin-bottom:0.5rem">Create a new household with the same name anyway?</p>
+    <div class="btn-row">
+      <button class="btn-secondary" id="dupe-cancel">Cancel</button>
+      <button class="btn-primary" id="dupe-confirm" style="background:#e65100">Create Anyway</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal-overlay" id="delete-modal" style="z-index:1100">
+  <div class="modal">
+    <h2 style="color:#c0392b">Remove Guest</h2>
+    <p style="font-size:0.9rem;color:#555;margin-bottom:1rem">This will permanently delete <strong id="delete-guest-name-display"></strong> and all their RSVPs. Type the guest name below to confirm.</p>
+    <div class="field">
+      <label>Type guest name to confirm</label>
+      <input type="text" id="delete-confirm-input" placeholder="" autocomplete="off">
+    </div>
+    <div class="btn-row">
+      <button class="btn-secondary" id="delete-cancel">Cancel</button>
+      <button class="btn-primary" id="delete-confirm" style="background:#c0392b" disabled>Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Guest Management Modal -->
+<div class="modal-overlay" id="guest-modal">
+  <div class="modal">
+    <h2 id="modal-title">New Household</h2>
+    <div class="field" id="field-household">
+      <label>Household Label</label>
+      <input type="text" id="modal-household" placeholder="e.g. Example Family">
+    </div>
+    <div class="field" id="field-source">
+      <label>Source</label>
+      <select id="modal-source"><option value="">—</option><option value="A">Partner One</option><option value="B">Partner Two</option></select>
+    </div>
+    <div id="modal-guests-container"></div>
+    <div id="modal-add-guest-row" class="field" style="display:none">
+      <button type="button" id="modal-add-guest-btn" class="btn-secondary" style="width:100%;border:1px dashed #bbb">+ Add another guest</button>
+    </div>
+    <div id="modal-result" class="result-box" style="display:none"></div>
+    <div class="btn-row">
+      <button class="btn-secondary" id="modal-cancel">Cancel</button>
+      <button class="btn-primary" id="modal-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_BASE = 'https://YOUR-WORKER.YOUR-SUBDOMAIN.workers.dev';
+const PUBLIC_RSVP_URL = 'https://YOURUSERNAME.github.io/YOUR-REPO/rsvp/';
+
+function buildSmsText(token, link) {
+  return `Together with their families, Partner One and Partner Two
+request the pleasure of your company at their wedding celebration.
+
+Lakeside, USA
+
+Please RSVP as soon as possible. (RSVP Code: ${token})
+To RSVP, please visit: ${link}
+
+We look forward to celebrating these special moments with you. ♡`;
+}
+
+function buildResultSmsHtml(token, linkUrl) {
+  const sms = buildSmsText(token, linkUrl);
+  return `<div class="result-sms-label">Text Message</div>
+    <div class="result-sms"><button class="copy-btn" onclick="
+      const txt = this.parentElement.textContent.replace('Copy','').replace('Copied ✓','').trim();
+      navigator.clipboard.writeText(txt).then(() => {
+        this.textContent = 'Copied ✓';
+        this.style.background = '#e8f5e9';
+        this.style.color = '#2e7d32';
+        this.style.borderColor = '#c5e1a5';
+        setTimeout(() => { this.textContent = 'Copy'; this.style.background = ''; this.style.color = ''; this.style.borderColor = ''; }, 2000);
+      });
+    ">Copy</button>${esc(sms)}</div>`;
+}
+const EVENT_ORDER = ['welcome', 'ceremony', 'farewell'];
+let allRows = [];       // raw rows from API (one per guest+event)
+let guestRows = [];     // one entry per guest (built from allRows)
+let sortCol = 'household_label';
+let sortDir = 1;
+let currentPin = '';
+let selectedEvents = new Set(); // for multi-select chip filter
+let chipFilterMode = 'exact';   // 'exact' = manual chip clicks, 'subset' = stat card clicks
+
+// ── PIN flow ─────────────────────────────────────────────────────────
+document.getElementById('pin-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') unlock();
+});
+document.getElementById('pin-btn').addEventListener('click', unlock);
+
+async function unlock() {
+  const pin = document.getElementById('pin-input').value.trim();
+  const errEl = document.getElementById('pin-error');
+  const btn = document.getElementById('pin-btn');
+  if (!pin) { errEl.textContent = 'Please enter the PIN.'; return; }
+
+  errEl.textContent = '';
+  btn.disabled = true;
+  btn.textContent = 'Checking…';
+
+  try {
+    const res = await fetch(`${API_BASE}/api/admin/rsvps`, {
+      headers: { 'Authorization': `Bearer ${pin}` }
+    });
+    if (res.status === 401) {
+      errEl.textContent = 'Incorrect PIN. Try again.';
+      btn.disabled = false;
+      btn.textContent = 'Unlock';
+      return;
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    allRows = data.rsvps ?? [];
+    currentPin = pin;
+
+    buildGuestRows();
+
+    // Populate source filter dynamically
+    const sources = [...new Set(allRows.map(r => r.source_list).filter(Boolean))].sort();
+    const srcSelect = document.getElementById('filter-source');
+    const hasMixed = guestRows.some(g => g.is_mixed);
+    srcSelect.innerHTML = '<option value="">All Sources</option>' +
+      sources.map(s => `<option value="${s}">${s}</option>`).join('') +
+      (hasMixed ? '<option value="Mixed">Mixed</option>' : '');
+    document.getElementById('pin-screen').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    document.getElementById('loading').style.display = 'none';
+    renderStats();
+    renderTable();
+    document.getElementById('stats').style.display = 'flex';
+    document.getElementById('controls').style.display = 'flex';
+    document.getElementById('table-wrap').style.display = 'block';
+  } catch (err) {
+    errEl.textContent = 'Failed to connect. Try again.';
+    btn.disabled = false;
+    btn.textContent = 'Unlock';
+  }
+}
+
+// ── Build guest-grouped rows from flat API rows ──────────────────────
+function buildGuestRows() {
+  const byGuest = new Map();
+  for (const r of allRows) {
+    if (!byGuest.has(r.guest_id)) {
+      // Parse invited_by: comma-separated A/B values matching event order
+      const invEvts = (r.invited_events ?? '').split(',').map(e => e.trim()).filter(Boolean);
+      const invByParts = (r.invited_by ?? '').split(',').map(v => v.trim());
+      const invitedByMap = {};  // event -> 'A' | 'B'
+      invEvts.forEach((evt, i) => { invitedByMap[evt] = invByParts[i] || ''; });
+      // Determine if mixed (different invited_by across events)
+      const uniqueInvBy = [...new Set(Object.values(invitedByMap).filter(Boolean))];
+      const isMixed = uniqueInvBy.length > 1;
+
+      byGuest.set(r.guest_id, {
+        guest_id:        r.guest_id,
+        invite_id:       r.invite_id,
+        full_name:       r.full_name,
+        household_label: r.household_label,
+        phone_e164:      r.phone_e164,
+        source_list:     r.source_list,
+        invited_events:  r.invited_events,
+        invited_by:      r.invited_by ?? '',
+        invited_by_map:  invitedByMap,
+        is_mixed:        isMixed,
+        events: {},       // event -> 'YES' | 'NO' | null
+        latest_updated:  null,
+      });
+    }
+    const g = byGuest.get(r.guest_id);
+    g.events[r.event] = r.attending ?? null;
+    if (r.updated_at && (!g.latest_updated || r.updated_at > g.latest_updated)) {
+      g.latest_updated = r.updated_at;
+    }
+  }
+  guestRows = [...byGuest.values()];
+
+  // Propagate mixed flag to entire household — if any guest is mixed, all are
+  const mixedHouseholds = new Set();
+  for (const g of guestRows) {
+    if (g.is_mixed) mixedHouseholds.add(g.invite_id);
+  }
+  for (const g of guestRows) {
+    if (mixedHouseholds.has(g.invite_id)) g.is_mixed = true;
+  }
+}
+
+// ── Stats ────────────────────────────────────────────────────────────
+function renderStats() {
+  const srcF = document.getElementById('filter-source')?.value ?? '';
+  const mixedGuestIdSet = new Set(guestRows.filter(g => g.is_mixed).map(g => g.guest_id));
+  const rows = srcF === 'Mixed' ? allRows.filter(r => mixedGuestIdSet.has(r.guest_id))
+             : srcF ? allRows.filter(r => r.source_list === srcF && !mixedGuestIdSet.has(r.guest_id))
+             : allRows;
+
+  const allGuestIds = [...new Set(rows.map(r => r.guest_id))];
+  const households  = new Set(rows.map(r => r.household_label + '\0' + (r.phone_e164 ?? ''))).size;
+  const guests      = allGuestIds.length;
+
+  // Responded households = at least one non-null attending in that household
+  const respondedHHKeys = new Set(
+    rows.filter(r => r.attending != null)
+           .map(r => r.household_label + '\0' + (r.phone_e164 ?? ''))
+  );
+
+  // Pending guests = guest has NO non-null responses at all
+  const respondedGuestIds = new Set(rows.filter(r => r.attending != null).map(r => r.guest_id));
+  const pendingGuests = allGuestIds.filter(id => !respondedGuestIds.has(id)).length;
+
+  // Build invited_by map for each guest from guestRows (filtered by source if needed)
+  const filteredGuestIds = new Set(rows.map(r => r.guest_id));
+  const relevantGuests = guestRows.filter(g => filteredGuestIds.has(g.guest_id));
+
+  const evtStats = EVENT_ORDER.map(evt => {
+    // When filtered by source: count by per-event invited_by across ALL guests
+    // When no filter: count all attending + show A/B breakdown
+    const allAttendingGuests = guestRows.filter(g => g.events[evt] === 'YES');
+    let attending, qCount = 0, uCount = 0;
+
+    if (srcF === 'A') {
+      attending = allAttendingGuests.filter(g => g.invited_by_map?.[evt] === 'A').length;
+    } else if (srcF === 'B') {
+      attending = allAttendingGuests.filter(g => g.invited_by_map?.[evt] === 'B').length;
+    } else if (srcF === 'Mixed') {
+      attending = allAttendingGuests.filter(g => g.is_mixed).length;
+    } else {
+      attending = allAttendingGuests.length;
+      for (const g of allAttendingGuests) {
+        const ib = g.invited_by_map?.[evt] ?? '';
+        if (ib === 'A') qCount++;
+        else if (ib === 'B') uCount++;
+      }
+    }
+    return { evt, attending, qCount, uCount };
+  });
+
+  const srcLabel = esc(srcF || '');
+
+  // A/B counts for households, guests, pending
+  const hhByKey = new Map();
+  for (const r of rows) {
+    const key = r.household_label + '\0' + (r.phone_e164 ?? '');
+    if (!hhByKey.has(key)) hhByKey.set(key, r.source_list);
+  }
+  const hhQ = [...hhByKey.values()].filter(s => s === 'A').length;
+  const hhU = [...hhByKey.values()].filter(s => s === 'B').length;
+
+  const guestSourceMap = new Map();
+  for (const r of rows) { if (!guestSourceMap.has(r.guest_id)) guestSourceMap.set(r.guest_id, r.source_list); }
+  const gQ = [...guestSourceMap.values()].filter(s => s === 'A').length;
+  const gU = [...guestSourceMap.values()].filter(s => s === 'B').length;
+
+  const pendingGuestSet = new Set(allGuestIds.filter(id => !respondedGuestIds.has(id)));
+  const pQ = [...pendingGuestSet].filter(id => guestSourceMap.get(id) === 'A').length;
+  const pU = [...pendingGuestSet].filter(id => guestSourceMap.get(id) === 'B').length;
+
+  const cards = [
+    { num: households,    lbl: 'Households', sub: srcF ? `${respondedHHKeys.size} responded · ${srcLabel}` : `${respondedHHKeys.size} responded<br>A: ${hhQ} · B: ${hhU}`, action: 'all' },
+    { num: guests,        lbl: 'Guests',     sub: srcF ? srcLabel : `A: ${gQ} · B: ${gU}`,                                                                action: 'all' },
+    { num: pendingGuests, lbl: 'Pending',    sub: srcF ? `no response yet · ${srcLabel}` : `no response yet<br>A: ${pQ} · B: ${pU}`, amber: true,      action: 'pending' },
+    ...evtStats.map(s => ({
+      num: s.attending,
+      lbl: s.evt.charAt(0).toUpperCase() + s.evt.slice(1) + ' Attending',
+      sub: srcF ? srcLabel : `A: ${s.qCount} · B: ${s.uCount}`,
+      green: true,
+      action: 'evt',
+      filterEvt: s.evt,
+    })),
+  ];
+
+  document.getElementById('stats').innerHTML = cards.map(s =>
+    `<div class="stat-card clickable" data-filter-action="${s.action}"${s.filterEvt ? ` data-filter-evt="${s.filterEvt}"` : ''}>
+      <div class="num${s.green ? ' green' : s.amber ? ' amber' : ''}">${s.num}</div>
+      <div class="lbl">${s.lbl}</div>
+      ${s.sub ? `<div class="sub">${s.sub}</div>` : ''}
+    </div>`
+  ).join('');
+}
+
+// ── Stat card click → set filters ───────────────────────────────────
+document.getElementById('stats').addEventListener('click', e => {
+  const card = e.target.closest('.stat-card.clickable');
+  if (!card) return;
+  const action = card.dataset.filterAction;
+  const evt    = card.dataset.filterEvt;
+
+  // Always reset chip filter and search
+  selectedEvents.clear();
+  chipFilterMode = 'exact';
+  document.querySelectorAll('.event-chip-btn').forEach(btn =>
+    btn.classList.remove('active-welcome', 'active-ceremony', 'active-farewell')
+  );
+  document.getElementById('search').value = '';
+  // intentionally NOT resetting filter-source — preserve the selected source list
+
+  if (action === 'all') {
+    // Households / Guests — clear everything
+    document.getElementById('filter-attending').value = '';
+
+  } else if (action === 'pending') {
+    // Pending — show guests with no response
+    document.getElementById('filter-attending').value = 'pending';
+
+  } else if (action === 'evt' && evt) {
+    // Event attending — subset mode: invited to this event AND said yes
+    selectedEvents.add(evt);
+    chipFilterMode = 'subset';
+    document.querySelectorAll('.event-chip-btn').forEach(btn => {
+      if (btn.dataset.event === evt) btn.classList.add(`active-${evt}`);
+    });
+    document.getElementById('filter-attending').value = 'yes';
+  }
+
+  renderTable();
+  document.getElementById('table-wrap').scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+// ── Chip filter ──────────────────────────────────────────────────────
+document.querySelectorAll('.event-chip-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const evt = btn.dataset.event;
+    chipFilterMode = 'exact'; // manual chip click always uses exact matching
+    if (selectedEvents.has(evt)) {
+      selectedEvents.delete(evt);
+      btn.classList.remove(`active-${evt}`);
+    } else {
+      selectedEvents.add(evt);
+      btn.classList.add(`active-${evt}`);
+    }
+    renderTable();
+  });
+});
+
+// ── Sorting ──────────────────────────────────────────────────────────
+document.querySelectorAll('thead th[data-col]').forEach(th => {
+  th.addEventListener('click', () => {
+    const col = th.dataset.col;
+    if (sortCol === col) { sortDir *= -1; } else { sortCol = col; sortDir = 1; }
+    document.querySelectorAll('thead th').forEach(t => t.classList.remove('sorted-asc','sorted-desc'));
+    th.classList.add(sortDir === 1 ? 'sorted-asc' : 'sorted-desc');
+    renderTable();
+  });
+});
+
+// ── Filtering ─────────────────────────────────────────────────────────
+document.getElementById('search').addEventListener('input', renderTable);
+document.getElementById('filter-attending').addEventListener('change', renderTable);
+document.getElementById('filter-source').addEventListener('change', () => { renderStats(); renderTable(); });
+
+function filteredGuestRows() {
+  const q    = document.getElementById('search').value.toLowerCase();
+  const attF = document.getElementById('filter-attending').value;
+  const srcF = document.getElementById('filter-source').value;
+
+  const filtered = guestRows.filter(g => {
+    if (q && !g.household_label?.toLowerCase().includes(q) && !g.full_name?.toLowerCase().includes(q)) return false;
+
+    // Multi-select "Invited To" filter
+    if (selectedEvents.size > 0) {
+      const inv = new Set((g.invited_events ?? '').split(',').map(e => e.trim()).filter(Boolean));
+      if (chipFilterMode === 'exact') {
+        // Manual chip: guest must be invited to exactly these events
+        if (inv.size !== selectedEvents.size) return false;
+        if (![...selectedEvents].every(e => inv.has(e))) return false;
+      } else {
+        // Stat card: guest just needs to be invited to all selected events (subset ok)
+        if (![...selectedEvents].every(e => inv.has(e))) return false;
+      }
+    }
+
+    // Response filter
+    // In subset mode (stat card click): check response for the specific selected event(s)
+    // In exact/no chip mode: check across all events
+    if (attF) {
+      if (chipFilterMode === 'subset' && selectedEvents.size > 0) {
+        const eventsToCheck = [...selectedEvents];
+        if (attF === 'yes'     && !eventsToCheck.every(e => g.events[e] === 'YES')) return false;
+        if (attF === 'no'      && !eventsToCheck.every(e => g.events[e] === 'NO'))  return false;
+        if (attF === 'pending' && !eventsToCheck.every(e => !g.events[e]))          return false;
+      } else {
+        const evtVals = Object.values(g.events);
+        if (attF === 'yes'     && !evtVals.includes('YES')) return false;
+        if (attF === 'no'      && !evtVals.includes('NO'))  return false;
+        if (attF === 'pending' && evtVals.some(v => v))     return false;
+      }
+    }
+
+    if (srcF === 'Mixed' && !g.is_mixed) return false;
+    if (srcF && srcF !== 'Mixed' && (g.source_list !== srcF || g.is_mixed)) return false;
+    return true;
+  });
+
+  // Precompute per-household max latest_updated (needed for updated_at primary sort)
+  const hhMaxUpdated = new Map();
+  for (const g of filtered) {
+    const hk = (g.household_label ?? '') + '\0' + (g.phone_e164 ?? '');
+    const cur = hhMaxUpdated.get(hk) ?? '';
+    const val = g.latest_updated ?? '';
+    if (val > cur) hhMaxUpdated.set(hk, val);
+  }
+
+  return filtered.sort((a, b) => {
+    const hkA = (a.household_label ?? '').toLowerCase() + '\0' + (a.phone_e164 ?? '');
+    const hkB = (b.household_label ?? '').toLowerCase() + '\0' + (b.phone_e164 ?? '');
+
+    if (sortCol === 'household_label') {
+      // Primary: household name with direction
+      if (hkA !== hkB) return hkA < hkB ? -sortDir : sortDir;
+      // Secondary: guest name within household (always asc)
+      return (a.full_name ?? '').toLowerCase() < (b.full_name ?? '').toLowerCase() ? -1 : 1;
+    }
+
+    if (sortCol === 'updated_at') {
+      // Primary: household ordered by its most-recent update
+      // Households with no responses always sink to the bottom regardless of direction
+      const hhKeyA = (a.household_label ?? '') + '\0' + (a.phone_e164 ?? '');
+      const hhKeyB = (b.household_label ?? '') + '\0' + (b.phone_e164 ?? '');
+      if (hhKeyA !== hhKeyB) {
+        const maxA = hhMaxUpdated.get(hhKeyA) ?? '';
+        const maxB = hhMaxUpdated.get(hhKeyB) ?? '';
+        const aHasDt = maxA !== '';
+        const bHasDt = maxB !== '';
+        if (!aHasDt && !bHasDt) return hkA < hkB ? -1 : hkA > hkB ? 1 : 0; // both pending: alpha
+        if (!aHasDt) return 1;  // A pending → always last
+        if (!bHasDt) return -1; // B pending → always last
+        return maxA < maxB ? -sortDir : maxA > maxB ? sortDir : 0;
+      }
+      // Secondary: individual guest updated_at within household
+      const av = a.latest_updated ?? '';
+      const bv = b.latest_updated ?? '';
+      const aHasDt = av !== '';
+      const bHasDt = bv !== '';
+      if (!aHasDt && !bHasDt) return 0;
+      if (!aHasDt) return 1;
+      if (!bHasDt) return -1;
+      return av < bv ? -sortDir : av > bv ? sortDir : 0;
+    }
+
+    // Other cols: group by household (always asc), secondary by sortCol
+    if (hkA !== hkB) return hkA < hkB ? -1 : 1;
+    const av = (a[sortCol] ?? '').toString().toLowerCase();
+    const bv = (b[sortCol] ?? '').toString().toLowerCase();
+    return av < bv ? -sortDir : av > bv ? sortDir : 0;
+  });
+}
+
+function renderTable() {
+  const rows = filteredGuestRows();
+  const tbody = document.getElementById('rsvp-tbody');
+
+  if (rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#aaa;padding:2rem">No results</td></tr>';
+    return;
+  }
+
+  let prevHouseKey = null;
+  tbody.innerHTML = rows.map(g => {
+    const houseKey = (g.household_label ?? '') + '\0' + (g.phone_e164 ?? '');
+    const isGroupStart = houseKey !== prevHouseKey;
+    prevHouseKey = houseKey;
+
+    const invitedTags = (g.invited_events ?? '').split(',').filter(Boolean)
+      .map(e => { const ev = e.trim(); return `<span class="tag tag-${ev}">${ev.charAt(0).toUpperCase() + ev.slice(1)}</span>`; }).join('');
+
+    const srcBadge = g.is_mixed
+      ? ` <span class="tag source-mixed">Mixed</span>`
+      : g.source_list
+        ? ` <span class="tag source-${g.source_list.toLowerCase()}">${esc(g.source_list)}</span>`
+        : '';
+
+    const hhBtns = isGroupStart
+      ? `<button class="add-guest-btn" data-invite-id="${g.invite_id}" data-household="${esc(g.household_label)}" title="Edit household">✎</button><button class="add-guest-btn regen-token-btn" data-invite-id="${g.invite_id}" data-household="${esc(g.household_label)}" title="Get RSVP link">🔗</button>`
+      : '';
+    const householdCell = isGroupStart
+      ? `<td class="household-cell">${esc(g.household_label)}${srcBadge}${hhBtns}</td>`
+      : `<td class="household-cell continued">↳</td>`;
+
+    // Per-event response rows (only for events they're invited to)
+    const invitedEvts = (g.invited_events ?? '').split(',').map(e => e.trim()).filter(Boolean);
+    const responseRows = invitedEvts.map(evt => {
+      const att = g.events[evt] ?? null;
+      const yesActive  = att === 'YES' ? 'active' : '';
+      const noActive   = att === 'NO'  ? 'active' : '';
+      const pendActive = !att           ? 'active' : '';
+      const ib = g.invited_by_map?.[evt] ?? '';
+      const ibTag = g.is_mixed && ib ? ` <span class="tag source-${ib === 'A' ? 'a' : 'b'}" style="font-size:0.65rem;padding:1px 5px">${ib}</span>` : '';
+      return `<div class="event-response-row">
+        <span class="event-label ${evt}">${evt.charAt(0).toUpperCase() + evt.slice(1)}${ibTag}</span>
+        <div class="toggle-group">
+          <button class="toggle-btn yes ${yesActive}"  data-gid="${g.guest_id}" data-evt="${evt}" data-val="YES">✓ Yes</button>
+          <button class="toggle-btn no  ${noActive}"   data-gid="${g.guest_id}" data-evt="${evt}" data-val="NO">✗ No</button>
+          <button class="toggle-btn pend ${pendActive}" data-gid="${g.guest_id}" data-evt="${evt}" data-val="PENDING">—</button>
+        </div>
+      </div>`;
+    }).join('');
+
+    const updated = g.latest_updated
+      ? `<span class="updated">${new Date(g.latest_updated).toLocaleDateString()}</span>`
+      : '<span class="updated">—</span>';
+
+    return `<tr${isGroupStart ? ' class="group-start"' : ''} data-guest-id="${g.guest_id}" data-invite-id="${g.invite_id}">
+      ${householdCell}
+      <td>${esc(g.full_name)}</td>
+      <td>${invitedTags}</td>
+      <td>${responseRows}</td>
+      <td>${updated}</td>
+      <td><div class="action-btns">
+        <button class="action-btn edit-guest-btn" data-gid="${g.guest_id}" title="Edit">✎</button>
+        <button class="action-btn del delete-guest-btn" data-gid="${g.guest_id}" data-name="${esc(g.full_name)}" title="Remove">✕</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Inline editing ───────────────────────────────────────────────────
+document.getElementById('rsvp-tbody').addEventListener('click', async e => {
+  const btn = e.target.closest('.toggle-btn');
+  if (!btn) return;
+
+  const guestId = Number(btn.dataset.gid);
+  const event   = btn.dataset.evt;
+  const val     = btn.dataset.val;  // 'YES' | 'NO' | 'PENDING'
+  const attending = val === 'YES' ? true : val === 'NO' ? false : null;
+
+  // Optimistic UI
+  const group = btn.closest('.toggle-group');
+  group.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active', 'saving');
+
+  try {
+    const res = await fetch(`${API_BASE}/api/admin/rsvp`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentPin}` },
+      body: JSON.stringify({ guest_id: guestId, event, attending })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    // Update in-memory allRows
+    const row = allRows.find(r => r.guest_id === guestId && r.event === event);
+    if (row) {
+      row.attending  = val === 'YES' ? 'YES' : val === 'NO' ? 'NO' : null;
+      row.updated_at = new Date().toISOString();
+    }
+    // Update guestRows
+    const guest = guestRows.find(g => g.guest_id === guestId);
+    if (guest) {
+      guest.events[event]    = val === 'YES' ? 'YES' : val === 'NO' ? 'NO' : null;
+      guest.latest_updated   = new Date().toISOString();
+    }
+    btn.classList.remove('saving');
+    renderStats();
+    renderTable();
+  } catch (err) {
+    btn.classList.remove('saving');
+    renderTable();
+    alert('Failed to save change. Please try again.');
+  }
+});
+
+// ── CSV Export ───────────────────────────────────────────────────────
+document.getElementById('export-btn').addEventListener('click', () => {
+  const rows = filteredGuestRows();
+  const headers = ['Household','Source','Guest','Invited Events','Invited By','Welcome','Ceremony','Farewell','Last Updated'];
+  const csv = [headers, ...rows.map(g => [
+    g.household_label,
+    g.source_list ?? '',
+    g.full_name,
+    g.invited_events,
+    g.invited_by ?? '',
+    g.events['welcome'] ?? 'Pending',
+    g.events['ceremony'] ?? 'Pending',
+    g.events['farewell'] ?? 'Pending',
+    g.latest_updated ? new Date(g.latest_updated).toLocaleDateString() : '',
+  ])].map(row => row.map(v => `"${String(v ?? '').replace(/"/g,'""')}"`).join(',')).join('\n');
+
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = `rsvps-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+});
+
+// ── Refresh data helper ─────────────────────────────────────────────
+async function refreshData() {
+  const res = await fetch(`${API_BASE}/api/admin/rsvps`, {
+    headers: { 'Authorization': `Bearer ${currentPin}` }
+  });
+  const data = await res.json();
+  allRows = data.rsvps ?? [];
+  buildGuestRows();
+  const sources = [...new Set(allRows.map(r => r.source_list).filter(Boolean))].sort();
+  const srcSelect = document.getElementById('filter-source');
+  const curSrc = srcSelect.value;
+  const hasMixed = guestRows.some(g => g.is_mixed);
+  srcSelect.innerHTML = '<option value="">All Sources</option>' +
+    sources.map(s => `<option value="${s}">${s}</option>`).join('') +
+    (hasMixed ? '<option value="Mixed">Mixed</option>' : '');
+  srcSelect.value = curSrc;
+  renderStats();
+  renderTable();
+}
+
+// ── Guest Management Modal ──────────────────────────────────────────
+const modalEl      = document.getElementById('guest-modal');
+const modalTitle   = document.getElementById('modal-title');
+const modalHH      = document.getElementById('modal-household');
+const modalSource  = document.getElementById('modal-source');
+const modalResult  = document.getElementById('modal-result');
+const modalGuestsCont = document.getElementById('modal-guests-container');
+const modalAddGuestRow = document.getElementById('modal-add-guest-row');
+const fieldHH      = document.getElementById('field-household');
+const fieldSource  = document.getElementById('field-source');
+
+let modalMode = null; // 'new-household' | 'add-guest' | 'edit-guest'
+let modalCtx  = {};
+
+function createGuestEntry(opts = {}) {
+  const div = document.createElement('div');
+  div.className = 'guest-entry';
+  const evtRows = ['welcome','ceremony','farewell'].map(evt => {
+    const isChecked = (opts.events ?? []).includes(evt);
+    const ibVal = opts.invited_by_map?.[evt] || '';
+    return `<div class="evt-row">
+      <label class="evt-name"><input type="checkbox" data-evt="${evt}" ${isChecked ? 'checked' : ''}>
+        <span class="evt-pill pill-${evt}${isChecked ? ' checked' : ''}">${evt.charAt(0).toUpperCase()+evt.slice(1)}</span>
+      </label>
+      <select data-evt="${evt}" class="ib-select${ibVal ? ' ib-'+ibVal : ''}">
+        <option value="" ${!ibVal?'selected':''}>—</option>
+        <option value="A" ${ibVal==='A'?'selected':''}>Partner One</option>
+        <option value="B" ${ibVal==='B'?'selected':''}>Partner Two</option>
+      </select>
+    </div>`;
+  }).join('');
+  if (opts.guest_id) div.dataset.guestId = opts.guest_id;
+  const removable = opts.removable !== false;
+  div.innerHTML = `
+    ${removable ? '<button type="button" class="remove-guest-entry" title="Remove">✕</button>' : ''}
+    <div class="field" style="margin-bottom:0.5rem">
+      <label>Guest Name</label>
+      <input type="text" class="guest-entry-name" value="${esc(opts.name ?? '')}" placeholder="Full name">
+    </div>
+    <div class="field" style="margin-bottom:0">
+      <label>Events & Invited By</label>
+      <div class="guest-entry-events">${evtRows}</div>
+    </div>`;
+  return div;
+}
+
+function getGuestEntryData(entry) {
+  const name = entry.querySelector('.guest-entry-name').value.trim();
+  const evts = []; const ibs = [];
+  entry.querySelectorAll('.guest-entry-events input[type="checkbox"]').forEach(cb => {
+    if (cb.checked) {
+      evts.push(cb.dataset.evt);
+      ibs.push(entry.querySelector(`.guest-entry-events select[data-evt="${cb.dataset.evt}"]`).value);
+    }
+  });
+  return { name, evts, ibs };
+}
+
+function openModal(mode, ctx = {}) {
+  modalMode = mode;
+  modalCtx  = ctx;
+  modalResult.style.display = 'none';
+  modalResult.textContent = '';
+  modalGuestsCont.innerHTML = '';
+  modalHH.value = '';
+  modalHH.readOnly = false;
+  modalSource.value = '';
+  modalSource.className = '';
+
+  if (mode === 'new-household') {
+    modalTitle.textContent = 'New Household';
+    fieldHH.style.display = '';
+    fieldSource.style.display = '';
+    modalAddGuestRow.style.display = '';
+    modalGuestsCont.appendChild(createGuestEntry({ removable: false }));
+    document.getElementById('modal-save').textContent = 'Create';
+  } else if (mode === 'add-guest') {
+    modalTitle.textContent = `Add Guest to ${ctx.household}`;
+    fieldHH.style.display = 'none';
+    fieldSource.style.display = 'none';
+    modalAddGuestRow.style.display = 'none';
+    modalGuestsCont.appendChild(createGuestEntry({ removable: false }));
+    document.getElementById('modal-save').textContent = 'Add Guest';
+  } else if (mode === 'edit-guest') {
+    modalTitle.textContent = 'Edit Guest';
+    fieldHH.style.display = 'none';
+    fieldSource.style.display = 'none';
+    modalAddGuestRow.style.display = 'none';
+    const invEvts = (ctx.invited_events ?? '').split(',').map(e => e.trim()).filter(Boolean);
+    modalGuestsCont.appendChild(createGuestEntry({
+      name: ctx.full_name, events: invEvts, invited_by_map: ctx.invited_by_map, removable: false, guest_id: ctx.guest_id
+    }));
+    document.getElementById('modal-save').textContent = 'Save Changes';
+  } else if (mode === 'edit-household') {
+    modalTitle.textContent = `Edit — ${ctx.household}`;
+    fieldHH.style.display = 'none';
+    fieldSource.style.display = 'none';
+    modalAddGuestRow.style.display = '';
+    for (const g of ctx.guests) {
+      const invEvts = (g.invited_events ?? '').split(',').map(e => e.trim()).filter(Boolean);
+      modalGuestsCont.appendChild(createGuestEntry({
+        name: g.full_name, events: invEvts, invited_by_map: g.invited_by_map, guest_id: g.guest_id, removable: true
+      }));
+    }
+    document.getElementById('modal-save').textContent = 'Save Changes';
+  }
+
+  modalEl.classList.add('open');
+  setTimeout(() => {
+    const firstInput = mode === 'new-household' ? modalHH : modalGuestsCont.querySelector('.guest-entry-name');
+    firstInput?.focus();
+  }, 50);
+}
+
+// Guest name conflict check
+const PLACEHOLDER_NAMES = new Set(['guest 1','guest 2','guest 3','child 1','child 2','child 3',
+  'daughter 1','daughter 2','daughter 3','husband of farah','husband of danai','daughter of shabana']);
+
+function checkGuestNameConflict(input) {
+  let hint = input.parentElement.querySelector('.name-conflict');
+  const val = input.value.trim().toLowerCase();
+  if (val.length < 2) { if (hint) hint.style.display = 'none'; return; }
+
+  const existing = guestRows
+    .filter(g => !PLACEHOLDER_NAMES.has(g.full_name.toLowerCase()));
+
+  const valParts = val.split(/\s+/);
+  const matches = existing.filter(g => {
+    const nl = g.full_name.toLowerCase();
+    // Exact full match
+    if (nl === val) return true;
+    // Check if any word in the input matches any word in the existing name
+    const nlParts = nl.split(/\s+/);
+    const sharedWords = valParts.filter(w => w.length > 2 && nlParts.some(nw => nw === w));
+    // At least one full word match (first or last name)
+    return sharedWords.length > 0;
+  });
+
+  // Deduplicate by guest_id
+  const seen = new Set();
+  const unique = matches.filter(g => { if (seen.has(g.guest_id)) return false; seen.add(g.guest_id); return true; });
+  if (unique.length > 0) {
+    if (!hint) {
+      hint = document.createElement('div');
+      hint.className = 'name-conflict';
+      hint.style.cssText = 'margin-top:4px;padding:6px 8px;background:#fff8e1;border:1px solid #ffe082;border-radius:5px;font-size:0.8rem;color:#7a5a00';
+      input.parentElement.appendChild(hint);
+    }
+    const labels = unique.slice(0, 5).map(g => `${g.full_name} (${g.household_label})`);
+    hint.textContent = `Found similar: ${labels.join(', ')}${unique.length > 5 ? '...' : ''}. Ignore if not a conflict.`;
+    hint.style.display = 'block';
+  } else if (hint) {
+    hint.style.display = 'none';
+  }
+}
+
+let nameDebounce = null;
+modalGuestsCont.addEventListener('input', e => {
+  if (!e.target.matches('.guest-entry-name')) return;
+  clearTimeout(nameDebounce);
+  nameDebounce = setTimeout(() => checkGuestNameConflict(e.target), 300);
+});
+
+function closeModal() {
+  modalEl.classList.remove('open');
+  modalMode = null;
+  modalCtx = {};
+}
+
+// Add another guest button
+document.getElementById('modal-add-guest-btn').addEventListener('click', () => {
+  modalGuestsCont.appendChild(createGuestEntry());
+});
+
+// Remove guest entry
+modalGuestsCont.addEventListener('click', e => {
+  const btn = e.target.closest('.remove-guest-entry');
+  if (!btn) return;
+  const entry = btn.closest('.guest-entry');
+  const guestId = entry.dataset.guestId;
+  const name = entry.querySelector('.guest-entry-name')?.value || 'this guest';
+  if (guestId) {
+    if (!confirm(`Remove ${name}? Their RSVPs will be deleted when you save.`)) return;
+  }
+  entry.remove();
+});
+
+// Toggle pill appearance when checkbox changes
+modalGuestsCont.addEventListener('change', e => {
+  if (e.target.matches('input[type="checkbox"]')) {
+    const pill = e.target.parentElement.querySelector('.evt-pill');
+    if (pill) pill.classList.toggle('checked', e.target.checked);
+  }
+  // Color the invited_by select on change
+  if (e.target.matches('.ib-select')) {
+    e.target.className = `ib-select ib-${e.target.value}`;
+  }
+});
+
+// Color source select
+const modalSourceEl = document.getElementById('modal-source');
+modalSourceEl.addEventListener('change', () => {
+  modalSourceEl.className = `src-${modalSourceEl.value}`;
+});
+
+// Close modal
+document.getElementById('modal-cancel').addEventListener('click', closeModal);
+modalEl.addEventListener('click', e => { if (e.target === modalEl) closeModal(); });
+
+// Save modal
+document.getElementById('modal-save').addEventListener('click', async () => {
+  if (modalMode === 'created') { closeModal(); return; }
+
+  const entries = [...modalGuestsCont.querySelectorAll('.guest-entry')];
+  const allGuests = entries.map(getGuestEntryData);
+
+  // Validate
+  for (const g of allGuests) {
+    if (!g.name) { alert('Guest name cannot be empty.'); return; }
+    if (g.evts.length === 0) { alert(`Select at least one event for ${g.name}.`); return; }
+    if (g.ibs.some(v => !v)) { alert(`Select Partner One or Partner Two for each event for ${g.name}.`); return; }
+  }
+
+  const saveBtn = document.getElementById('modal-save');
+  saveBtn.disabled = true;
+
+  try {
+    if (modalMode === 'new-household') {
+      const household_label = modalHH.value.trim();
+      if (!household_label) { alert('Household label cannot be empty.'); saveBtn.disabled = false; return; }
+      if (!modalSource.value) { alert('Select Partner One or Partner Two for source.'); saveBtn.disabled = false; return; }
+      const guests = allGuests.map(g => ({ full_name: g.name, events: g.evts.join(','), invited_by: g.ibs.join(',') }));
+      let payload = { household_label, source_list: modalSource.value, guests };
+      let res = await fetch(`${API_BASE}/api/admin/household`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentPin}` },
+        body: JSON.stringify(payload)
+      });
+      if (res.status === 409) {
+        const dupeData = await res.json();
+        if (dupeData.error === 'duplicate') {
+          saveBtn.disabled = false;
+          // Show dupe modal and wait for user decision
+          const proceed = await showDupeModal(household_label, dupeData.existing);
+          if (!proceed) return;
+          saveBtn.disabled = true;
+          payload.force = true;
+          res = await fetch(`${API_BASE}/api/admin/household`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentPin}` },
+            body: JSON.stringify(payload)
+          });
+        }
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const safeToken = esc(data.token);
+      const linkUrl = `${PUBLIC_RSVP_URL}?t=${encodeURIComponent(data.token)}`;
+      modalResult.innerHTML = `
+        <div class="result-label">RSVP Code</div>
+        <div class="result-code">${safeToken}</div>
+        <div class="result-link"><a href="${esc(linkUrl)}" target="_blank">${esc(linkUrl)}</a></div>
+        <div class="result-warning">Save this link now — it can only be seen once. Use 🔗 on the dashboard to regenerate if needed.</div>
+      ` + buildResultSmsHtml(safeToken, linkUrl);
+      modalResult.style.display = 'block';
+      saveBtn.textContent = 'Done';
+      saveBtn.disabled = false;
+      modalMode = 'created'; // Prevent re-submission
+      await refreshData();
+      return; // Keep modal open to show the link
+
+    } else if (modalMode === 'add-guest') {
+      const g = allGuests[0];
+      const res = await fetch(`${API_BASE}/api/admin/guest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentPin}` },
+        body: JSON.stringify({ invite_id: modalCtx.invite_id, full_name: g.name, events: g.evts.join(','), invited_by: g.ibs.join(',') })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    } else if (modalMode === 'edit-guest') {
+      const g = allGuests[0];
+      const res = await fetch(`${API_BASE}/api/admin/guest`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentPin}` },
+        body: JSON.stringify({ guest_id: modalCtx.guest_id, full_name: g.name, events: g.evts.join(','), invited_by: g.ibs.join(',') })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    } else if (modalMode === 'edit-household') {
+      const entryEls = [...modalGuestsCont.querySelectorAll('.guest-entry')];
+      const currentIds = new Set(entryEls.map(el => el.dataset.guestId).filter(Boolean).map(Number));
+      const originalIds = new Set(modalCtx.guests.map(g => g.guest_id));
+      const hdrs = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentPin}` };
+
+      // Delete removed guests
+      const toDelete = [...originalIds].filter(id => !currentIds.has(id));
+      for (const gid of toDelete) {
+        const r = await fetch(`${API_BASE}/api/admin/guest`, { method: 'DELETE', headers: hdrs, body: JSON.stringify({ guest_id: gid }) });
+        if (!r.ok) throw new Error(`Failed to delete guest ${gid}`);
+      }
+
+      // Update existing + add new
+      for (let i = 0; i < entryEls.length; i++) {
+        const el = entryEls[i];
+        const data = allGuests[i];
+        const existingId = el.dataset.guestId ? Number(el.dataset.guestId) : null;
+
+        if (existingId) {
+          // Patch existing
+          const r = await fetch(`${API_BASE}/api/admin/guest`, { method: 'PATCH', headers: hdrs,
+            body: JSON.stringify({ guest_id: existingId, full_name: data.name, events: data.evts.join(','), invited_by: data.ibs.join(',') })
+          });
+          if (!r.ok) throw new Error(`Failed to update guest ${existingId}`);
+        } else {
+          // Add new
+          const r = await fetch(`${API_BASE}/api/admin/guest`, { method: 'POST', headers: hdrs,
+            body: JSON.stringify({ invite_id: modalCtx.invite_id, full_name: data.name, events: data.evts.join(','), invited_by: data.ibs.join(',') })
+          });
+          if (!r.ok) throw new Error(`Failed to add guest ${data.name}`);
+        }
+      }
+    }
+
+    saveBtn.disabled = false;
+    closeModal();
+    await refreshData();
+  } catch (err) {
+    saveBtn.disabled = false;
+    alert('Failed to save. Please try again.');
+  }
+});
+
+// Wire up table buttons
+const tbodyEl = document.getElementById('rsvp-tbody');
+
+// ── Regenerate token modal ───────────────────────────────────────────
+const regenModal = document.getElementById('regen-modal');
+const regenResult = document.getElementById('regen-result');
+const regenConfirm = document.getElementById('regen-confirm');
+const regenClose = document.getElementById('regen-close');
+let regenInviteId = null;
+
+tbodyEl.addEventListener('click', e => {
+  const btn = e.target.closest('.regen-token-btn');
+  if (!btn) return;
+  regenInviteId = Number(btn.dataset.inviteId);
+  document.getElementById('regen-title').textContent = `RSVP Link — ${btn.dataset.household}`;
+  regenResult.style.display = 'none';
+  regenConfirm.style.display = '';
+  regenConfirm.disabled = false;
+  regenClose.style.display = 'none';
+  regenModal.classList.add('open');
+});
+
+regenConfirm.addEventListener('click', async () => {
+  regenConfirm.disabled = true;
+  try {
+    const res = await fetch(`${API_BASE}/api/admin/regenerate-token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentPin}` },
+      body: JSON.stringify({ invite_id: regenInviteId })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const safeToken = esc(data.token);
+    const linkUrl = `${PUBLIC_RSVP_URL}?t=${encodeURIComponent(data.token)}`;
+    regenResult.innerHTML = `
+      <div class="result-label">New RSVP Code</div>
+      <div class="result-code">${safeToken}</div>
+      <div class="result-link"><a href="${esc(linkUrl)}" target="_blank">${esc(linkUrl)}</a></div>
+      <div class="result-warning">The previous link for this household no longer works.</div>
+    ` + buildResultSmsHtml(safeToken, linkUrl);
+    regenResult.style.display = 'block';
+    regenConfirm.style.display = 'none';
+    regenClose.style.display = '';
+  } catch (err) {
+    regenConfirm.disabled = false;
+    alert('Failed to regenerate code.');
+  }
+});
+
+regenClose.addEventListener('click', () => { regenModal.classList.remove('open'); });
+regenModal.addEventListener('click', e => { if (e.target === regenModal) regenModal.classList.remove('open'); });
+
+// ── Duplicate confirmation modal ─────────────────────────────────────
+const dupeModal = document.getElementById('dupe-modal');
+let dupeResolve = null;
+
+function showDupeModal(label, existing) {
+  document.getElementById('dupe-msg').textContent = `"${label}" already exists with the following guests:`;
+  const listEl = document.getElementById('dupe-existing');
+  listEl.innerHTML = existing.map(g => {
+    const evts = (g.events ?? '').split(',').map(e => e.trim()).filter(Boolean)
+      .map(e => `<span class="tag tag-${e}">${e.charAt(0).toUpperCase()+e.slice(1)}</span>`).join(' ');
+    const ib = (g.invited_by ?? '').split(',').map(v => v.trim()).filter(Boolean)
+      .map(v => `<span class="tag source-${v === 'A' ? 'a' : 'b'}">${v === 'A' ? 'A' : 'B'}</span>`).join(' ');
+    return `<div style="padding:4px 0;border-bottom:1px solid #f0f0f0"><strong>${esc(g.full_name)}</strong> ${evts} ${ib}</div>`;
+  }).join('');
+  dupeModal.classList.add('open');
+  return new Promise(resolve => { dupeResolve = resolve; });
+}
+
+document.getElementById('dupe-confirm').addEventListener('click', () => {
+  dupeModal.classList.remove('open');
+  if (dupeResolve) { dupeResolve(true); dupeResolve = null; }
+});
+document.getElementById('dupe-cancel').addEventListener('click', () => {
+  dupeModal.classList.remove('open');
+  if (dupeResolve) { dupeResolve(false); dupeResolve = null; }
+});
+dupeModal.addEventListener('click', e => {
+  if (e.target === dupeModal) {
+    dupeModal.classList.remove('open');
+    if (dupeResolve) { dupeResolve(false); dupeResolve = null; }
+  }
+});
+
+// Delete guest — open delete confirmation modal
+let deleteGid = null;
+let deleteExpectedName = '';
+const deleteModal   = document.getElementById('delete-modal');
+const deleteInput   = document.getElementById('delete-confirm-input');
+const deleteBtn     = document.getElementById('delete-confirm');
+const deleteDisplay = document.getElementById('delete-guest-name-display');
+
+deleteInput.addEventListener('input', () => {
+  deleteBtn.disabled = deleteInput.value.trim() !== deleteExpectedName;
+});
+
+document.getElementById('delete-cancel').addEventListener('click', () => {
+  deleteModal.classList.remove('open');
+});
+deleteModal.addEventListener('click', e => { if (e.target === deleteModal) deleteModal.classList.remove('open'); });
+
+deleteBtn.addEventListener('click', async () => {
+  if (deleteInput.value.trim() !== deleteExpectedName) return;
+  deleteBtn.disabled = true;
+  try {
+    const res = await fetch(`${API_BASE}/api/admin/guest`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentPin}` },
+      body: JSON.stringify({ guest_id: deleteGid })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    deleteModal.classList.remove('open');
+    await refreshData();
+  } catch (err) {
+    deleteBtn.disabled = false;
+    alert('Failed to delete guest.');
+  }
+});
+
+tbodyEl.addEventListener('click', e => {
+  const btn = e.target.closest('.delete-guest-btn');
+  if (!btn) return;
+  deleteGid = Number(btn.dataset.gid);
+  deleteExpectedName = btn.dataset.name;
+  deleteDisplay.textContent = deleteExpectedName;
+  deleteInput.value = '';
+  deleteInput.placeholder = deleteExpectedName;
+  deleteBtn.disabled = true;
+  deleteModal.classList.add('open');
+  setTimeout(() => deleteInput.focus(), 50);
+});
+
+// Edit guest — open modal
+tbodyEl.addEventListener('click', e => {
+  const btn = e.target.closest('.edit-guest-btn');
+  if (!btn) return;
+  const gid = Number(btn.dataset.gid);
+  const g = guestRows.find(r => r.guest_id === gid);
+  if (!g) return;
+  openModal('edit-guest', { guest_id: gid, full_name: g.full_name, invited_events: g.invited_events, invited_by_map: g.invited_by_map });
+});
+
+// Edit household — open modal with all guests
+tbodyEl.addEventListener('click', e => {
+  const btn = e.target.closest('.add-guest-btn');
+  if (!btn || btn.classList.contains('regen-token-btn')) return;
+  const inviteId = Number(btn.dataset.inviteId);
+  const household = btn.dataset.household;
+  const householdGuests = guestRows.filter(g => g.invite_id === inviteId);
+  openModal('edit-household', { invite_id: inviteId, household, guests: householdGuests });
+});
+
+// New household button
+document.getElementById('new-household-btn').addEventListener('click', () => {
+  openModal('new-household');
+});
+</script>
+</body>
+</html>

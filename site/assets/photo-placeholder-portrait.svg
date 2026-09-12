@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1200" role="img" aria-labelledby="title desc">
+  <title id="title">Portrait photo placeholder</title>
+  <desc id="desc">Replace this file with a portrait photo.</desc>
+  <rect width="900" height="1200" fill="#ddd0b8"/>
+  <rect x="55" y="55" width="790" height="1090" rx="18" fill="#f7f0e3" stroke="#aa8f69" stroke-width="6" stroke-dasharray="20 16"/>
+  <text x="450" y="585" text-anchor="middle" fill="#715b43" font-family="Arial, sans-serif" font-size="38">Replace with your photo</text>
+  <text x="450" y="640" text-anchor="middle" fill="#8a765e" font-family="Arial, sans-serif" font-size="24">900 × 1200 recommended</text>
+</svg>

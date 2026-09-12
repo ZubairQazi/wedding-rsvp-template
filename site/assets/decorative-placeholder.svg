@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700" role="img" aria-labelledby="title desc">
+  <title id="title">Decorative artwork placeholder</title>
+  <desc id="desc">A neutral placeholder to replace with non-sensitive decorative artwork.</desc>
+  <rect width="1200" height="700" fill="#e8dcc4"/>
+  <path d="M0 540 C260 380 420 650 650 500 S980 330 1200 500 V700 H0Z" fill="#c8b28d" opacity=".55"/>
+  <circle cx="235" cy="205" r="115" fill="#f8f1e3" opacity=".8"/>
+  <text x="600" y="350" text-anchor="middle" fill="#715b43" font-family="Georgia, serif" font-size="42">Replace decorative artwork</text>
+</svg>

@@ -1,0 +1,4 @@
+household_label,phone_e164,guest_name,events,source_list
+"Example Family",+15550101001,"Alex Guest",welcome|ceremony|farewell,A
+"Example Family",+15550101001,"Jordan Guest",ceremony|farewell,A
+"Sample Household",+15550101002,"Taylor Guest",ceremony,B
