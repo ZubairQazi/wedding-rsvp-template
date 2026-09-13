@@ -11,6 +11,7 @@ scripts/import.csv
 scripts/sms.csv
 scripts/seed.sql
 scripts/*.private.csv
+*.private.sql
 scripts/.env
 
 # Local build and preview output

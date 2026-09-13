@@ -225,6 +225,43 @@ Create the tables and indexes:
 npm run db:migrate:remote
 ```
 
+### Reuse an existing D1 database
+
+If the guest master list already lives in Cloudflare D1, do not create or seed
+a second database until you have inspected the existing one. Authenticate, list
+the databases, and export a private backup:
+
+```bash
+cd worker
+npx wrangler login
+npx wrangler d1 list
+npx wrangler d1 export EXISTING_DATABASE_NAME --remote \
+  --output=../existing-d1.private.sql
+```
+
+The export can contain names, phone numbers, invite hashes, notes, and RSVP
+details. Keep it outside the public repository and delete local copies securely
+when they are no longer needed.
+
+Inspect the existing schema without printing guest records:
+
+```bash
+npx wrangler d1 execute EXISTING_DATABASE_NAME --remote --command \
+  "SELECT type, name, sql FROM sqlite_schema WHERE type IN ('table', 'index') ORDER BY type, name;"
+```
+
+Compare it with `schema.sql`. Verify the `invites`, `guests`, `rsvps`, and
+`rate_limits` tables, foreign-key relationships, the unique invite token hash,
+and the unique `(guest_id, event)` RSVP pair. If the old schema or event names
+differ, write and test an explicit migration on a copy; do not apply the
+template schema blindly to the live database.
+
+If the existing database is compatible, put its name and ID in
+`worker/wrangler.toml` and continue with the read-only count checks in
+[Verify D1 after importing](#verify-d1-after-importing). Only generate and
+import a new master list when the existing database is empty or you have a
+reviewed migration plan.
+
 ## 5. Configure and deploy the Worker
 
 Set exact frontend origins in `worker/wrangler.toml`. Origins have no trailing
@@ -279,6 +316,24 @@ household_label,phone_e164,guest_name,events,source_list
 - Separate multiple event keys with `|`.
 - Use source `A` or `B`, or leave it blank.
 
+### Verify the master list before generating codes
+
+The importer expects one CSV row per guest. Before generating anything, check
+that:
+
+- Every row has `household_label`, `phone_e164`, and `guest_name`.
+- Every phone number is in E.164 format and belongs to the intended household.
+- Rows sharing a phone number also use the same household label and source.
+- The number of unique phone numbers matches the expected household count.
+- Event values use only `welcome`, `ceremony`, and `farewell`, separated by `|`.
+- Duplicate guest names are intentional rather than repeated spreadsheet rows.
+- Source values are `A`, `B`, or blank. The template applies that source to all
+  events for the household; convert event-specific ownership before importing.
+
+The generator groups households by `phone_e164`. Missing or unrecognized event
+values fall back to all three events, so review the generated files before
+importing them.
+
 Generate household codes and import SQL from the repository root:
 
 ```bash
@@ -290,6 +345,12 @@ node scripts/import_to_d1.mjs --output=scripts/seed.sql
 cd worker
 npx wrangler d1 execute your-wedding-rsvp --remote --file=../scripts/seed.sql
 ```
+
+> **Do not run the same seed twice against the same database.** Invite rows are
+> protected by the unique token hash, but guest rows do not have a matching
+> uniqueness constraint and can be duplicated by a repeated import. If an
+> import needs to be replaced, use a fresh database or deliberately clean the
+> affected records after making a backup.
 
 The generated files are ignored because they contain private or usable data:
 
@@ -304,6 +365,57 @@ D1.
 
 To seed the local database instead, replace `--remote` with `--local` in the
 final command.
+
+### Verify D1 after importing
+
+Run read-only checks against the intended database. These queries return only
+counts and integrity problems, not guest contact details:
+
+```bash
+cd worker
+npx wrangler d1 execute your-wedding-rsvp --remote --command \
+  "SELECT COUNT(*) AS households FROM invites; SELECT COUNT(*) AS guests FROM guests; SELECT COUNT(*) AS responses FROM rsvps;"
+
+npx wrangler d1 execute your-wedding-rsvp --remote --command \
+  "SELECT COUNT(*) AS orphan_guests FROM guests g LEFT JOIN invites i ON i.id = g.invite_id WHERE i.id IS NULL; SELECT COUNT(*) AS orphan_responses FROM rsvps r LEFT JOIN guests g ON g.id = r.guest_id WHERE g.id IS NULL;"
+
+npx wrangler d1 execute your-wedding-rsvp --remote --command \
+  "SELECT COUNT(*) AS duplicate_phones FROM (SELECT phone_e164 FROM invites GROUP BY phone_e164 HAVING COUNT(*) > 1); SELECT COUNT(*) AS duplicate_guest_rows FROM (SELECT invite_id, full_name FROM guests GROUP BY invite_id, full_name HAVING COUNT(*) > 1);"
+```
+
+Compare the household and guest counts with the reviewed master list. All four
+integrity/duplicate counts should be zero. RSVP rows are created only after a
+guest submits a response, so zero responses is normal immediately after setup.
+
+## Backend go-live verification
+
+Before sharing invitation links, verify all of the following:
+
+- `worker/wrangler.toml` contains the correct D1 database ID, exact frontend
+  origins, and wedding date.
+- `DASHBOARD_PIN` is stored with `wrangler secret put`, is not in Git, and is
+  different from the disposable `demo` PIN.
+- `API_BASE` in `site/js/rsvp.js` and `site/dashboard/index.html` points to the
+  deployed Worker, and `PUBLIC_RSVP_URL` points to the deployed RSVP page.
+- The schema was applied to the remote database and the count/integrity queries
+  above match the reviewed master list.
+- A real test household code loads only that household, submits an RSVP, and
+  still shows the saved response after reloading.
+- A made-up or superseded code returns not found, without exposing another
+  household.
+- The live dashboard rejects a wrong PIN, accepts the production PIN, displays
+  the saved test response, and persists an edit after reload.
+- Regenerating a household link invalidates its previous code and the newly
+  generated link works.
+- The deployed frontend origin can call the Worker and an unapproved origin is
+  rejected by CORS.
+- `/dashboard/?demo=1` and the `demo` PIN remain visibly marked as a temporary
+  demo; edits work in memory and disappear on reload without contacting D1.
+
+Keep the old Cloudflare master list private. If you reuse it, export it to the
+documented CSV shape locally, audit it with the checklist above, and never add
+the export, generated codes, seed SQL, database identifiers, or guest details
+to this public repository.
 
 ## 7. Publish the frontend with GitHub Pages
 
