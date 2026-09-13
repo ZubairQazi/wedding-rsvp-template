@@ -8,6 +8,11 @@ The repository contains only fictional example content and placeholder media.
 Create a private repository from this template before adding real names, guest
 details, addresses, photos, or credentials.
 
+No Cloudflare account, Worker, D1 database, or real guest list is included or
+connected. The dashboard and RSVP demos run entirely in the browser with
+fictional data. Forkers create their own private backend only if they want a
+live deployment.
+
 ![Wedding website homepage](docs/images/homepage.png)
 
 ## Included
@@ -105,6 +110,22 @@ Guest browser             Admin browser
 Public routes look up an invite and save RSVPs. Admin routes require the Worker
 secret and provide reporting, response corrections, guest management, and code
 regeneration.
+
+### Database blueprint
+
+`schema.sql` describes the database a forker can create in their own Cloudflare
+account. It contains four tables:
+
+| Table | Purpose |
+| --- | --- |
+| `invites` | One household, its hashed invite code, contact fields, and optional source label |
+| `guests` | Individual guests belonging to a household and their invited events |
+| `rsvps` | One response per guest and event, including attendance and meal details |
+| `rate_limits` | Request counters used to limit repeated invite-code lookups |
+
+One invite can have many guests, and one guest can have one RSVP row for each
+invited event. The SQL file is only a blueprint: cloning or forking this
+repository does not create a database or copy anyone else's data.
 
 | Method | Route | Purpose |
 | --- | --- | --- |
@@ -225,11 +246,12 @@ Create the tables and indexes:
 npm run db:migrate:remote
 ```
 
-### Reuse an existing D1 database
+### Optional: migrate from an existing D1 database
 
-If the guest master list already lives in Cloudflare D1, do not create or seed
-a second database until you have inspected the existing one. Authenticate, list
-the databases, and export a private backup:
+Forkers who already have a guest list in Cloudflare D1 can migrate it instead
+of starting from a CSV. Do not create or seed a second database until the
+existing schema has been inspected. Authenticate, list the databases, and
+export a private backup:
 
 ```bash
 cd worker
@@ -412,10 +434,10 @@ Before sharing invitation links, verify all of the following:
 - `/dashboard/?demo=1` and the `demo` PIN remain visibly marked as a temporary
   demo; edits work in memory and disappear on reload without contacting D1.
 
-Keep the old Cloudflare master list private. If you reuse it, export it to the
+Keep every real master list private. If migrating one, export it to the
 documented CSV shape locally, audit it with the checklist above, and never add
 the export, generated codes, seed SQL, database identifiers, or guest details
-to this public repository.
+to a public repository.
 
 ## 7. Publish the frontend with GitHub Pages
 
