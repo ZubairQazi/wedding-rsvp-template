@@ -94,14 +94,13 @@ window.addEventListener('load', () => {
   if (prefersReduced) {
     document.body.classList.remove('gsap-ready');
     gsap.set([
-      '.hero-floral', '.hero-names', '.hero-tagline',
+      '.hero-names', '.hero-tagline',
       '.hero-countdown', '#main-nav', '.main-details', '.collage-section'
     ], { opacity: 1, clearProps: 'all' });
     return;
   }
 
   // ── Initial states
-  gsap.set('.hero-floral',    { opacity: 0, y: -24, scale: 0.95 });
   gsap.set('.hero-letter',    { opacity: 0, y: 38, rotateY: 80, transformOrigin: '50% 100%' });
   gsap.set('.hero-tagline',   { opacity: 0, y: 16 });
   gsap.set('.hero-countdown', { opacity: 0, y: 12, scale: 0.88 });
@@ -117,15 +116,12 @@ window.addEventListener('load', () => {
   });
 
   tl
-    .to('.hero-floral', {
-      opacity: 1, y: 0, scale: 1, duration: 1.1,
-    })
     .to('.hero-letter', {
       opacity: 1, y: 0, rotateY: 0,
       duration: 0.72,
       ease: 'back.out(2)',
       stagger: { each: 0.038, ease: 'power2.inOut' },
-    }, '-=0.5')
+    })
     .to('.hero-tagline', {
       opacity: 1, y: 0, duration: 0.65,
     }, '-=0.3')
@@ -142,17 +138,6 @@ window.addEventListener('load', () => {
       opacity: 1, y: 0, duration: 0.9, ease: 'power2.out',
     }, '-=0.4');
 
-  // ── Scroll-driven parallax on floral illustration
-  if (typeof ScrollTrigger !== 'undefined') {
-    ScrollTrigger.create({
-      trigger: '#hero',
-      start: 'top top',
-      end: 'bottom top',
-      onUpdate(self) {
-        gsap.set('.hero-floral', { yPercent: self.progress * -20 });
-      }
-    });
-  }
 });
 
 // ── Photo tilt on mousemove (desktop only) ─────────────────────────

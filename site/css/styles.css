@@ -186,49 +186,81 @@ h1, h2, h3, h4, h5, h6 {
    ══════════════════════════════════════════════════════════════════ */
 #hero {
   text-align: center;
-  padding-top: clamp(220px, 28vw, 400px);
-  padding-bottom: var(--space-8);
   position: relative;
-  overflow: visible;
-  background: var(--color-bg);
+  overflow: hidden;
 }
 
-.hero-floral {
+.home-hero {
+  min-height: min(760px, 78vh);
+  display: grid;
+  place-items: center;
+  padding-block: clamp(6rem, 12vw, 10rem);
+}
+
+.home-hero::before,
+.home-hero::after {
+  content: '';
   position: absolute;
-  top: clamp(40px, 7vw, 110px);
-  /* Break out of container padding so the left drape isn't clipped */
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(100vw, calc(var(--content-max) + 6rem));
+  border-radius: 50%;
   pointer-events: none;
-  will-change: transform, opacity;
-  z-index: 2;
 }
 
-.hero-floral img,
-.hero-floral svg {
-  width: 100%;
-  height: auto;
-  mix-blend-mode: multiply;
-  display: block;
+.home-hero::before {
+  width: clamp(18rem, 38vw, 34rem);
+  aspect-ratio: 1;
+  left: clamp(-13rem, -12vw, -5rem);
+  top: clamp(-9rem, -7vw, -3rem);
+  border: 1px solid color-mix(in srgb, var(--color-accent-light) 64%, transparent);
+}
+
+.home-hero::after {
+  width: clamp(14rem, 30vw, 26rem);
+  aspect-ratio: 1;
+  right: clamp(-11rem, -9vw, -4rem);
+  bottom: clamp(-10rem, -8vw, -3rem);
+  background: color-mix(in srgb, var(--color-bg-muted) 58%, transparent);
+}
+
+.subpage-hero {
+  padding-block: clamp(3.5rem, 8vw, 6rem) var(--space-10);
 }
 
 .hero-text {
   position: relative;
-  z-index: 3;
+  z-index: 1;
+  width: 100%;
+}
+
+.hero-kicker {
+  margin-bottom: var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--color-accent);
 }
 
 .hero-names {
   font-family: var(--font-serif);
-  font-size: clamp(2.60rem, 5.2vw, 4.40rem);
+  font-size: clamp(3rem, 6vw, 4.8rem);
   font-weight: 300;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.055em;
   text-transform: uppercase;
   color: var(--color-text);
-  line-height: 1.05;
-  white-space: nowrap;
+  line-height: 0.95;
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: center;
+  gap: 0.08em;
   will-change: transform, opacity;
 }
+
+.partner-name {
+  white-space: nowrap;
+}
+
+.partner-name:first-child,
+.partner-name:last-child { text-align: center; }
 
 .hero-names .ampersand {
   font-style: italic;
@@ -236,15 +268,40 @@ h1, h2, h3, h4, h5, h6 {
   letter-spacing: 0.06em;
   color: var(--color-accent);
   display: inline-block;
-  padding-inline: 0.25em;
+  font-size: 0.68em;
+  line-height: 0.72;
 }
 
 /* Compact variant used on sub-pages (schedule etc.) */
 .hero-names--sm {
-  font-size: var(--text-3xl);
+  max-width: 820px;
+  margin-inline: auto;
+  font-size: clamp(2.15rem, 4.5vw, 3.2rem);
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: clamp(0.6rem, 1.6vw, 1.25rem);
+}
+
+.hero-names--sm .partner-name:first-child { text-align: right; }
+.hero-names--sm .partner-name:last-child { text-align: left; }
+
+@media (max-width: 820px) {
+  .hero-names--sm {
+    grid-template-columns: 1fr;
+    gap: 0.08em;
+  }
+
+  .hero-names--sm .partner-name:first-child,
+  .hero-names--sm .partner-name:last-child {
+    text-align: center;
+  }
 }
 
 .hero-tagline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.9rem;
   font-family: var(--font-serif);
   font-size: var(--text-lg);
   font-weight: 300;
@@ -450,18 +507,19 @@ h1, h2, h3, h4, h5, h6 {
 .photo-collage {
   position: relative;
   width: 100%;
-  max-width: 580px;
-  height: clamp(460px, 62vw, 580px);
-  /* overflow visible so photos can rotate slightly outside bounds */
+  max-width: 920px;
+  display: grid;
+  grid-template-columns: 0.92fr 1.16fr 0.92fr;
+  align-items: center;
+  gap: clamp(1rem, 2.4vw, 2rem);
+  padding-block: var(--space-6);
 }
 
 .collage-item {
-  position: absolute;
-  /* overflow NOT hidden here — border strip must stay visible for caption */
+  position: relative;
   background: #fff;
-  /* photo-print look */
-  border: 10px solid #fff;
-  border-bottom-width: 28px;
+  border: 8px solid #fff;
+  border-bottom-width: 34px;
   border-radius: 2px;
   box-shadow:
     0 4px 14px rgba(0,0,0,0.18),
@@ -494,34 +552,22 @@ h1, h2, h3, h4, h5, h6 {
 
 /* ── Photo 1: couple portrait — large, top-left ── */
 .collage-top {
-  width: 56%;
-  height: 58%;
-  top: 0;
-  left: 0;
-  transform: rotate(-3.5deg);
-  z-index: 3;
+  aspect-ratio: 3 / 4;
+  transform: rotate(-2deg);
 }
 .collage-top img { object-position: center 15%; }
 
 /* ── Photo 2: childhood/landscape — upper-right ── */
 .collage-right {
-  width: 50%;
-  height: 38%;
-  top: 12%;
-  right: -4%;
-  transform: rotate(2.5deg);
-  z-index: 2;
+  aspect-ratio: 4 / 3;
+  transform: translateY(-1.5rem) rotate(1.5deg);
 }
 .collage-right img { object-position: center 40%; }
 
 /* ── Photo 3: proposal portrait — bottom center, clearly visible ── */
 .collage-bottom {
-  width: 50%;
-  height: 52%;
-  bottom: 0;
-  left: 18%;
-  transform: rotate(-1deg);
-  z-index: 1;
+  aspect-ratio: 3 / 4;
+  transform: rotate(2deg);
 }
 .collage-bottom img { object-position: center 25%; }
 
@@ -552,15 +598,13 @@ h1, h2, h3, h4, h5, h6 {
 
 /* ── Mobile: scaled-down collage (keep absolute layout, shorter container) ── */
 @media (max-width: 540px) {
-  /* ── Hero: names sit just below the arch opening ── */
-  #hero {
-    padding-top: clamp(140px, 38vw, 200px);
+  .home-hero {
+    min-height: min(620px, 72svh);
   }
 
   .hero-names {
-    font-size: clamp(1.9rem, 8vw, 2.4rem);
-    white-space: nowrap;
-    letter-spacing: 0.08em;
+    font-size: clamp(1.75rem, 7.5vw, 2.25rem);
+    letter-spacing: 0.035em;
   }
 
   .hero-tagline {
@@ -568,27 +612,32 @@ h1, h2, h3, h4, h5, h6 {
     font-size: clamp(0.72rem, 2.8vw, 0.9rem);
     letter-spacing: 0.16em;
     margin-top: var(--space-2);
+    flex-direction: column;
+    gap: 0.15rem;
   }
+
+  .tagline-separator { display: none; }
 
   .hero-countdown {
     margin-top: var(--space-3);
   }
 
-  /* clip any rotation-caused pixel bleed at the section level */
-  .collage-section { overflow: hidden; }
-
   .photo-collage {
-    height: clamp(340px, 95vw, 460px);
-    max-width: 100%;
-    overflow: visible;
-    margin-bottom: 2rem;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-4);
+    padding-inline: var(--space-2);
   }
-  /* top photo: slightly smaller so right photo has breathing room */
-  .collage-top    { width: 54%; height: 62%; top: 0; left: 0; }
-  /* right photo: anchor to right edge — safe at all widths regardless of rotation */
-  .collage-right  { width: 48%; height: 44%; top: 10%; right: 0; left: auto; }
-  /* bottom photo: stay within container bounds so it doesn't look like a separate row */
-  .collage-bottom { width: 58%; height: 52%; bottom: 0; left: 20%; }
+
+  .collage-right {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    width: 72%;
+    justify-self: center;
+    transform: rotate(1deg);
+  }
+
+  .collage-top,
+  .collage-bottom { transform: none; }
 }
 
 /* RSVP Button */
@@ -1388,36 +1437,16 @@ h1, h2, h3, h4, h5, h6 {
 .site-footer {
   margin-top: auto;
   position: relative;
-  z-index: 0;          /* creates stacking context below page z-index:1 main */
-  overflow: visible;
-  padding-top: clamp(30px, 4vw, 55px);
+  z-index: 0;
+  padding-top: var(--space-8);
   padding-bottom: var(--space-8);
   text-align: center;
   border-top: 1px solid var(--color-border);
 }
 
-.footer-floral {
-  position: absolute;
-  top: 0;
-  left: 0;
-  transform: translateY(-22%);
-  width: 100%;
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* On the RSVP page, keep main above the footer floral so the submit button
-   is never obscured — home page intentionally allows floral to overlay */
 .page-rsvp main {
   position: relative;
   z-index: 1;
-}
-
-.footer-floral img {
-  width: 100%;
-  height: auto;
-  display: block;
-  mix-blend-mode: multiply;
 }
 
 .footer-text {
@@ -1456,7 +1485,6 @@ h1, h2, h3, h4, h5, h6 {
    GSAP INITIAL STATES (JS adds .gsap-ready to <body>)
    Hides animated elements before JS runs — graceful no-JS fallback
    ══════════════════════════════════════════════════════════════════ */
-body.gsap-ready .hero-floral,
 body.gsap-ready .hero-names,
 body.gsap-ready .hero-letter,
 body.gsap-ready .hero-tagline,
@@ -1492,19 +1520,21 @@ body.gsap-ready .collage-section {
 
 /* ── Responsive typography fixes ───────────────────────────────── */
 @media (max-width: 480px) {
-  /* Clip the floral tail before it overlaps the hero names on mobile */
-  .hero-floral {
-    max-height: 44vw;
-    overflow: hidden;
-  }
-
-  /* Scale hero name down so it never overflows or hyphenates */
   .hero-names {
-    font-size: min(8.5vw, 2.60rem) !important;
-    white-space: normal;
+    grid-template-columns: 1fr;
+    gap: 0.15em;
     hyphens: none;
     overflow-wrap: normal;
-    letter-spacing: 0.06em;
+  }
+
+  .partner-name:first-child,
+  .partner-name:last-child {
+    text-align: center;
+  }
+
+  .hero-names .ampersand {
+    font-size: 0.72em;
+    line-height: 0.8;
   }
 
   .nav-list {

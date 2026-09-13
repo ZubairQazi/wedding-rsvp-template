@@ -12,7 +12,10 @@
  */
 
 // ── Config ─────────────────────────────────────────────────────────
-const API_BASE = 'https://YOUR-WORKER.YOUR-SUBDOMAIN.workers.dev';
+const IS_LOCAL_PREVIEW = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+const API_BASE = IS_LOCAL_PREVIEW
+  ? 'http://localhost:8787'
+  : 'https://YOUR-WORKER.YOUR-SUBDOMAIN.workers.dev';
 
 const EVENT_META = {
   welcome:   { label: 'Welcome Dinner', day: 'Friday, September 18',   time: '6:00 PM',  address: 'Venue address shared with guests', image: '../assets/event-placeholder.svg' },

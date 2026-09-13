@@ -72,6 +72,19 @@
     }
     #pin-btn:hover { background: #7a5f40; }
     #pin-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    #demo-btn {
+      width: 100%; margin-top: 0.6rem; padding: 0.65rem; border: 1px solid #bfa98c;
+      border-radius: 6px; background: transparent; color: #6f583d; font-size: 0.85rem;
+      font-weight: 600; cursor: pointer;
+    }
+    #demo-btn:hover { background: #f5ecdf; }
+    .pin-hint { margin-top: 0.8rem; color: #7b6a57; font-size: 0.8rem; }
+    .pin-hint code { background: #eee5d7; border-radius: 4px; padding: 2px 6px; color: #5a3e2b; }
+    #demo-banner {
+      display: none; width: 100%; max-width: 1200px; margin: 0 auto 1rem;
+      padding: 0.75rem 1rem; border: 1px solid #d8bd8d; border-radius: 8px;
+      background: #fff8e8; color: #6f5127; font-size: 0.88rem; text-align: center;
+    }
 
     /* ── Dashboard ── */
     #dashboard { display: none; width: 100%; max-width: 1100px; }
@@ -367,11 +380,14 @@
   <input type="password" id="pin-input" placeholder="••••••" autocomplete="current-password">
   <div id="pin-error"></div>
   <button id="pin-btn">Unlock</button>
+  <button id="demo-btn" type="button">Open demo dashboard</button>
+  <p class="pin-hint">Or enter <code>demo</code> as the PIN</p>
 </div>
 
 <!-- Dashboard (hidden until authenticated) -->
 <div id="dashboard">
   <p id="loading">Loading RSVPs…</p>
+  <div id="demo-banner" role="status">Demo dashboard — all data is fictional. Changes are temporary and reset when you reload.</div>
 
   <div class="stats" id="stats" style="display:none"></div>
 
@@ -481,8 +497,24 @@
 </div>
 
 <script>
-const API_BASE = 'https://YOUR-WORKER.YOUR-SUBDOMAIN.workers.dev';
-const PUBLIC_RSVP_URL = 'https://YOURUSERNAME.github.io/YOUR-REPO/rsvp/';
+const IS_LOCAL_PREVIEW = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+const API_BASE = IS_LOCAL_PREVIEW
+  ? 'http://localhost:8787'
+  : 'https://YOUR-WORKER.YOUR-SUBDOMAIN.workers.dev';
+const PUBLIC_RSVP_URL = IS_LOCAL_PREVIEW
+  ? 'http://localhost:5050/rsvp/'
+  : 'https://YOURUSERNAME.github.io/YOUR-REPO/rsvp/';
+const DEMO_PIN = 'demo';
+const DEMO_ROWS = [
+  { household_label: 'Example Family', phone_e164: '+15550101001', invite_id: 101, source_list: 'A', guest_id: 1001, full_name: 'Alex Guest', invited_events: 'welcome,ceremony,farewell', invited_by: 'A,A,A', event: 'welcome', attending: 'YES', updated_at: '2027-06-12T18:30:00Z' },
+  { household_label: 'Example Family', phone_e164: '+15550101001', invite_id: 101, source_list: 'A', guest_id: 1001, full_name: 'Alex Guest', invited_events: 'welcome,ceremony,farewell', invited_by: 'A,A,A', event: 'ceremony', attending: 'YES', updated_at: '2027-06-12T18:30:00Z' },
+  { household_label: 'Example Family', phone_e164: '+15550101001', invite_id: 101, source_list: 'A', guest_id: 1001, full_name: 'Alex Guest', invited_events: 'welcome,ceremony,farewell', invited_by: 'A,A,A', event: 'farewell', attending: null, updated_at: null },
+  { household_label: 'Example Family', phone_e164: '+15550101001', invite_id: 101, source_list: 'A', guest_id: 1002, full_name: 'Jordan Guest', invited_events: 'ceremony,farewell', invited_by: 'B,B', event: 'ceremony', attending: 'NO', updated_at: '2027-06-10T14:15:00Z' },
+  { household_label: 'Example Family', phone_e164: '+15550101001', invite_id: 101, source_list: 'A', guest_id: 1002, full_name: 'Jordan Guest', invited_events: 'ceremony,farewell', invited_by: 'B,B', event: 'farewell', attending: 'YES', updated_at: '2027-06-10T14:15:00Z' },
+  { household_label: 'Sample Household', phone_e164: '+15550101002', invite_id: 102, source_list: 'B', guest_id: 1003, full_name: 'Taylor Guest', invited_events: 'ceremony', invited_by: 'B', event: null, attending: null, updated_at: null },
+  { household_label: 'Morgan Household', phone_e164: '+15550101003', invite_id: 103, source_list: 'A', guest_id: 1004, full_name: 'Casey Morgan', invited_events: 'welcome,ceremony', invited_by: 'A,B', event: 'welcome', attending: 'YES', updated_at: '2027-06-08T20:00:00Z' },
+  { household_label: 'Morgan Household', phone_e164: '+15550101003', invite_id: 103, source_list: 'A', guest_id: 1004, full_name: 'Casey Morgan', invited_events: 'welcome,ceremony', invited_by: 'A,B', event: 'ceremony', attending: 'YES', updated_at: '2027-06-08T20:00:00Z' },
+];
 
 function buildSmsText(token, link) {
   return `Together with their families, Partner One and Partner Two
@@ -516,14 +548,131 @@ let guestRows = [];     // one entry per guest (built from allRows)
 let sortCol = 'household_label';
 let sortDir = 1;
 let currentPin = '';
+let isDemoMode = false;
 let selectedEvents = new Set(); // for multi-select chip filter
 let chipFilterMode = 'exact';   // 'exact' = manual chip clicks, 'subset' = stat card clicks
+
+function demoJson(data, status = 200) {
+  return Promise.resolve(new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  }));
+}
+
+function nextDemoId(field) {
+  return Math.max(0, ...allRows.map(row => Number(row[field]) || 0)) + 1;
+}
+
+function replaceDemoGuest(guestId, data) {
+  const existing = allRows.filter(row => row.guest_id === guestId);
+  const base = existing[0];
+  if (!base) return false;
+  const invitedBy = data.invited_by ?? base.invited_by ?? '';
+  const priorByEvent = new Map(existing.map(row => [row.event, row]));
+  allRows = allRows.filter(row => row.guest_id !== guestId);
+  for (const event of String(data.events ?? base.invited_events).split(',').filter(Boolean)) {
+    const prior = priorByEvent.get(event);
+    allRows.push({
+      ...base,
+      full_name: data.full_name ?? base.full_name,
+      invited_events: data.events ?? base.invited_events,
+      invited_by: invitedBy,
+      event,
+      attending: prior?.attending ?? null,
+      updated_at: prior?.updated_at ?? null,
+    });
+  }
+  return true;
+}
+
+function demoApiFetch(url, options = {}) {
+  const pathname = new URL(url, window.location.href).pathname;
+  const method = (options.method ?? 'GET').toUpperCase();
+  const body = options.body ? JSON.parse(options.body) : {};
+
+  if (pathname === '/api/admin/rsvps' && method === 'GET') {
+    return demoJson({ rsvps: allRows.map(row => ({ ...row })) });
+  }
+
+  if (pathname === '/api/admin/rsvp' && method === 'PATCH') {
+    let row = allRows.find(item => item.guest_id === body.guest_id && item.event === body.event);
+    if (!row) return demoJson({ error: 'Guest event not found' }, 404);
+    row.attending = body.attending === true ? 'YES' : body.attending === false ? 'NO' : null;
+    row.updated_at = new Date().toISOString();
+    return demoJson({ success: true });
+  }
+
+  if (pathname === '/api/admin/household' && method === 'POST') {
+    const inviteId = nextDemoId('invite_id');
+    for (const guest of body.guests ?? []) {
+      const guestId = nextDemoId('guest_id');
+      const events = String(guest.events ?? '').split(',').filter(Boolean);
+      for (const event of events) {
+        allRows.push({
+          household_label: body.household_label,
+          phone_e164: '',
+          invite_id: inviteId,
+          source_list: body.source_list ?? '',
+          guest_id: guestId,
+          full_name: guest.full_name,
+          invited_events: guest.events,
+          invited_by: guest.invited_by ?? '',
+          event,
+          attending: null,
+          updated_at: null,
+        });
+      }
+    }
+    return demoJson({ token: 'DEMO1', invite_id: inviteId });
+  }
+
+  if (pathname === '/api/admin/guest' && method === 'POST') {
+    const household = allRows.find(row => row.invite_id === body.invite_id);
+    if (!household) return demoJson({ error: 'Household not found' }, 404);
+    const guestId = nextDemoId('guest_id');
+    for (const event of String(body.events ?? '').split(',').filter(Boolean)) {
+      allRows.push({
+        ...household,
+        guest_id: guestId,
+        full_name: body.full_name,
+        invited_events: body.events,
+        invited_by: body.invited_by ?? '',
+        event,
+        attending: null,
+        updated_at: null,
+      });
+    }
+    return demoJson({ success: true, guest_id: guestId });
+  }
+
+  if (pathname === '/api/admin/guest' && method === 'PATCH') {
+    return replaceDemoGuest(body.guest_id, body)
+      ? demoJson({ success: true })
+      : demoJson({ error: 'Guest not found' }, 404);
+  }
+
+  if (pathname === '/api/admin/guest' && method === 'DELETE') {
+    allRows = allRows.filter(row => row.guest_id !== body.guest_id);
+    return demoJson({ success: true });
+  }
+
+  if (pathname === '/api/admin/regenerate-token' && method === 'POST') {
+    return demoJson({ token: 'DEMO' + Math.floor(10 + Math.random() * 90) });
+  }
+
+  return demoJson({ error: 'Unsupported demo operation' }, 400);
+}
+
+function dashboardFetch(url, options) {
+  return isDemoMode ? demoApiFetch(url, options) : fetch(url, options);
+}
 
 // ── PIN flow ─────────────────────────────────────────────────────────
 document.getElementById('pin-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') unlock();
 });
 document.getElementById('pin-btn').addEventListener('click', unlock);
+document.getElementById('demo-btn').addEventListener('click', openDemo);
 
 async function unlock() {
   const pin = document.getElementById('pin-input').value.trim();
@@ -535,8 +684,13 @@ async function unlock() {
   btn.disabled = true;
   btn.textContent = 'Checking…';
 
+  if (pin.toLowerCase() === DEMO_PIN) {
+    openDemo();
+    return;
+  }
+
   try {
-    const res = await fetch(`${API_BASE}/api/admin/rsvps`, {
+    const res = await dashboardFetch(`${API_BASE}/api/admin/rsvps`, {
       headers: { 'Authorization': `Bearer ${pin}` }
     });
     if (res.status === 401) {
@@ -547,31 +701,49 @@ async function unlock() {
     }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    allRows = data.rsvps ?? [];
     currentPin = pin;
-
-    buildGuestRows();
-
-    // Populate source filter dynamically
-    const sources = [...new Set(allRows.map(r => r.source_list).filter(Boolean))].sort();
-    const srcSelect = document.getElementById('filter-source');
-    const hasMixed = guestRows.some(g => g.is_mixed);
-    srcSelect.innerHTML = '<option value="">All Sources</option>' +
-      sources.map(s => `<option value="${s}">${s}</option>`).join('') +
-      (hasMixed ? '<option value="Mixed">Mixed</option>' : '');
-    document.getElementById('pin-screen').style.display = 'none';
-    document.getElementById('dashboard').style.display = 'block';
-    document.getElementById('loading').style.display = 'none';
-    renderStats();
-    renderTable();
-    document.getElementById('stats').style.display = 'flex';
-    document.getElementById('controls').style.display = 'flex';
-    document.getElementById('table-wrap').style.display = 'block';
+    showDashboard(data.rsvps ?? [], false);
   } catch (err) {
     errEl.textContent = 'Failed to connect. Try again.';
     btn.disabled = false;
     btn.textContent = 'Unlock';
   }
+}
+
+function openDemo() {
+  document.getElementById('pin-error').textContent = '';
+  showDashboard(DEMO_ROWS, true);
+}
+
+function showDashboard(rows, demoMode) {
+  allRows = rows.map(row => ({ ...row }));
+  isDemoMode = demoMode;
+  currentPin = demoMode ? '' : currentPin;
+  document.body.classList.toggle('demo-mode', demoMode);
+  buildGuestRows();
+
+  const sources = [...new Set(allRows.map(r => r.source_list).filter(Boolean))].sort();
+  const srcSelect = document.getElementById('filter-source');
+  const hasMixed = guestRows.some(g => g.is_mixed);
+  srcSelect.innerHTML = '<option value="">All Sources</option>' +
+    sources.map(s => `<option value="${s}">${s}</option>`).join('') +
+    (hasMixed ? '<option value="Mixed">Mixed</option>' : '');
+
+  document.getElementById('pin-screen').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('demo-banner').style.display = demoMode ? 'block' : 'none';
+  document.getElementById('new-household-btn').disabled = false;
+  document.getElementById('new-household-btn').title = demoMode ? 'Demo changes reset when you reload' : '';
+  renderStats();
+  renderTable();
+  document.getElementById('stats').style.display = 'flex';
+  document.getElementById('controls').style.display = 'flex';
+  document.getElementById('table-wrap').style.display = 'block';
+}
+
+if (new URLSearchParams(window.location.search).get('demo') === '1') {
+  openDemo();
 }
 
 // ── Build guest-grouped rows from flat API rows ──────────────────────
@@ -968,7 +1140,7 @@ document.getElementById('rsvp-tbody').addEventListener('click', async e => {
   btn.classList.add('active', 'saving');
 
   try {
-    const res = await fetch(`${API_BASE}/api/admin/rsvp`, {
+    const res = await dashboardFetch(`${API_BASE}/api/admin/rsvp`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentPin}` },
       body: JSON.stringify({ guest_id: guestId, event, attending })
@@ -1021,7 +1193,7 @@ document.getElementById('export-btn').addEventListener('click', () => {
 
 // ── Refresh data helper ─────────────────────────────────────────────
 async function refreshData() {
-  const res = await fetch(`${API_BASE}/api/admin/rsvps`, {
+  const res = await dashboardFetch(`${API_BASE}/api/admin/rsvps`, {
     headers: { 'Authorization': `Bearer ${currentPin}` }
   });
   const data = await res.json();
@@ -1272,7 +1444,7 @@ document.getElementById('modal-save').addEventListener('click', async () => {
       if (!modalSource.value) { alert('Select Partner One or Partner Two for source.'); saveBtn.disabled = false; return; }
       const guests = allGuests.map(g => ({ full_name: g.name, events: g.evts.join(','), invited_by: g.ibs.join(',') }));
       let payload = { household_label, source_list: modalSource.value, guests };
-      let res = await fetch(`${API_BASE}/api/admin/household`, {
+      let res = await dashboardFetch(`${API_BASE}/api/admin/household`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentPin}` },
         body: JSON.stringify(payload)
@@ -1286,7 +1458,7 @@ document.getElementById('modal-save').addEventListener('click', async () => {
           if (!proceed) return;
           saveBtn.disabled = true;
           payload.force = true;
-          res = await fetch(`${API_BASE}/api/admin/household`, {
+          res = await dashboardFetch(`${API_BASE}/api/admin/household`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentPin}` },
             body: JSON.stringify(payload)
@@ -1312,7 +1484,7 @@ document.getElementById('modal-save').addEventListener('click', async () => {
 
     } else if (modalMode === 'add-guest') {
       const g = allGuests[0];
-      const res = await fetch(`${API_BASE}/api/admin/guest`, {
+      const res = await dashboardFetch(`${API_BASE}/api/admin/guest`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentPin}` },
         body: JSON.stringify({ invite_id: modalCtx.invite_id, full_name: g.name, events: g.evts.join(','), invited_by: g.ibs.join(',') })
@@ -1321,7 +1493,7 @@ document.getElementById('modal-save').addEventListener('click', async () => {
 
     } else if (modalMode === 'edit-guest') {
       const g = allGuests[0];
-      const res = await fetch(`${API_BASE}/api/admin/guest`, {
+      const res = await dashboardFetch(`${API_BASE}/api/admin/guest`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentPin}` },
         body: JSON.stringify({ guest_id: modalCtx.guest_id, full_name: g.name, events: g.evts.join(','), invited_by: g.ibs.join(',') })
@@ -1337,7 +1509,7 @@ document.getElementById('modal-save').addEventListener('click', async () => {
       // Delete removed guests
       const toDelete = [...originalIds].filter(id => !currentIds.has(id));
       for (const gid of toDelete) {
-        const r = await fetch(`${API_BASE}/api/admin/guest`, { method: 'DELETE', headers: hdrs, body: JSON.stringify({ guest_id: gid }) });
+        const r = await dashboardFetch(`${API_BASE}/api/admin/guest`, { method: 'DELETE', headers: hdrs, body: JSON.stringify({ guest_id: gid }) });
         if (!r.ok) throw new Error(`Failed to delete guest ${gid}`);
       }
 
@@ -1349,13 +1521,13 @@ document.getElementById('modal-save').addEventListener('click', async () => {
 
         if (existingId) {
           // Patch existing
-          const r = await fetch(`${API_BASE}/api/admin/guest`, { method: 'PATCH', headers: hdrs,
+          const r = await dashboardFetch(`${API_BASE}/api/admin/guest`, { method: 'PATCH', headers: hdrs,
             body: JSON.stringify({ guest_id: existingId, full_name: data.name, events: data.evts.join(','), invited_by: data.ibs.join(',') })
           });
           if (!r.ok) throw new Error(`Failed to update guest ${existingId}`);
         } else {
           // Add new
-          const r = await fetch(`${API_BASE}/api/admin/guest`, { method: 'POST', headers: hdrs,
+          const r = await dashboardFetch(`${API_BASE}/api/admin/guest`, { method: 'POST', headers: hdrs,
             body: JSON.stringify({ invite_id: modalCtx.invite_id, full_name: data.name, events: data.evts.join(','), invited_by: data.ibs.join(',') })
           });
           if (!r.ok) throw new Error(`Failed to add guest ${data.name}`);
@@ -1397,7 +1569,7 @@ tbodyEl.addEventListener('click', e => {
 regenConfirm.addEventListener('click', async () => {
   regenConfirm.disabled = true;
   try {
-    const res = await fetch(`${API_BASE}/api/admin/regenerate-token`, {
+    const res = await dashboardFetch(`${API_BASE}/api/admin/regenerate-token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentPin}` },
       body: JSON.stringify({ invite_id: regenInviteId })
@@ -1478,7 +1650,7 @@ deleteBtn.addEventListener('click', async () => {
   if (deleteInput.value.trim() !== deleteExpectedName) return;
   deleteBtn.disabled = true;
   try {
-    const res = await fetch(`${API_BASE}/api/admin/guest`, {
+    const res = await dashboardFetch(`${API_BASE}/api/admin/guest`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentPin}` },
       body: JSON.stringify({ guest_id: deleteGid })

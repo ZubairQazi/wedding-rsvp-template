@@ -1,118 +1,234 @@
-# Wedding website and private RSVP template
+# Wedding RSVP website template
 
-A customizable, static wedding website with a Cloudflare Worker and D1 backend.
-It includes a home page, multi-event schedule, invite-code RSVP flow, protected
-admin dashboard, guest import tools, and optional Twilio invitations.
+A customizable wedding website with a private invite-code RSVP flow, a
+Cloudflare Worker and D1 backend, an admin dashboard, guest import tools, and
+optional Twilio invitations.
 
-This repository contains only fictional example content and placeholder artwork.
-Create a new repository from it so your real guest data never shares Git history
-with the public template.
+The repository contains only fictional example content and placeholder media.
+Create a private repository from this template before adding real names, guest
+details, addresses, photos, or credentials.
 
-## What is included
+![Wedding website homepage](docs/images/homepage.png)
+
+## Included
 
 ```text
-site/                 Static HTML, CSS, JavaScript, and admin dashboard
-worker/               Cloudflare Worker API written in TypeScript
-scripts/              Guest-token, D1 import, and optional Twilio SMS tools
-schema.sql            Cloudflare D1 schema
-.github/workflows/    GitHub Pages deployment for the frontend
+site/                    Static website, RSVP flow, and admin dashboard
+site/dashboard/          Dashboard with a safe browser-only demo
+worker/                  Cloudflare Worker API written in TypeScript
+scripts/                 Guest-token, D1 import, and optional Twilio tools
+schema.sql               Cloudflare D1 database schema
+docs/images/             Fictional screenshots used by this guide
+.github/workflows/       Manual GitHub Pages deployment workflow
 ```
 
-The public API supports invite lookup and RSVP submission. Admin routes support
-dashboard reporting, response updates, household and guest management, and RSVP
-code regeneration. Raw invite codes are never stored in D1; only SHA-256 hashes
-are stored.
+The Worker stores only SHA-256 hashes of invite codes. Raw invite codes are
+created by the local import tools and never stored in D1.
 
-## Prerequisites
+## Try it locally in two minutes
+
+You only need Python for the frontend demos:
+
+```bash
+python3 -m http.server 5050 --directory site
+```
+
+Then open:
+
+- Website: `http://localhost:5050/`
+- RSVP demo: `http://localhost:5050/rsvp/?demo=1`
+- Dashboard demo: `http://localhost:5050/dashboard/?demo=1`
+
+The dashboard demo can also be opened from `/dashboard/` by entering `demo` as
+the PIN or clicking **Open demo dashboard**. It uses fictional data in memory,
+makes no backend requests, and resets every change when the page reloads.
+
+## RSVP experience
+
+Each household receives one short invite code. The RSVP page loads every guest
+in that household and shows only the events to which each guest is invited.
+Guests can accept or decline each event separately.
+
+![Fictional RSVP demo](docs/images/rsvp-demo.png)
+
+The built-in `?demo=1` route is safe to share as a visual preview because it
+does not read or write D1.
+
+## Dashboard guide
+
+Open `/dashboard/`. Use `demo` for the fictional sandbox or your private
+`DASHBOARD_PIN` for live data.
+
+![Fictional admin dashboard](docs/images/dashboard-demo.png)
+
+### Summary cards
+
+The top row shows household and guest totals, pending guests, and attendance by
+event. Select a card to filter the guest table to the corresponding group.
+Attendance cards also show the optional source-list split.
+
+### Search and filters
+
+- Search by guest or household name.
+- Select one or more **Invited To** chips.
+- Filter by attending, declining, or pending status.
+- Filter by source list `A`, `B`, or `Mixed`.
+- Select sortable table headings to change the ordering.
+
+### RSVP management
+
+- Use the Yes, No, and pending controls to correct a response.
+- Select the pencil beside a guest to change their name, events, or source.
+- Select the household pencil to edit everyone in that household together.
+- Use **New Household** to create a household and its first guests.
+- Remove a guest through the delete action and confirmation dialog.
+- Use the link action to generate a replacement RSVP code. The previous code
+  stops working when a real backend is connected.
+- Use **Export CSV** to download the currently filtered dashboard view.
+
+Demo-mode edits behave like the live controls but remain only in the current
+browser tab. Reloading restores the original fictional records.
+
+## How the system fits together
+
+```text
+Guest browser             Admin browser
+     |                          |
+     | invite code              | Bearer DASHBOARD_PIN
+     v                          v
+             Cloudflare Worker API
+                       |
+                       v
+                 Cloudflare D1
+```
+
+Public routes look up an invite and save RSVPs. Admin routes require the Worker
+secret and provide reporting, response corrections, guest management, and code
+regeneration.
+
+| Method | Route | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/invite?t=CODE` | Load a household invitation |
+| `POST` | `/api/rsvp?t=CODE` | Save guest responses |
+| `GET` | `/api/admin/rsvps` | Load dashboard data |
+| `PATCH` | `/api/admin/rsvp` | Correct a response |
+| `POST` | `/api/admin/household` | Create a household |
+| `POST` | `/api/admin/guest` | Add a guest |
+| `PATCH` | `/api/admin/guest` | Edit a guest |
+| `DELETE` | `/api/admin/guest` | Remove a guest |
+| `POST` | `/api/admin/regenerate-token` | Replace a household code |
+
+## Prerequisites for a live deployment
 
 - Node.js 20 or newer
 - A Cloudflare account for Workers and D1
-- A GitHub repository if you want GitHub Pages hosting
-- A Twilio account only if you want to send invitation texts
+- A GitHub repository if using GitHub Pages
+- A Twilio account only if sending invitation texts
 
-## 1. Make your private working copy
+## 1. Create a private working copy
 
-Do not add real guest information to a public repository. Create a private repo
-from this template, then clone that private copy.
+Click **Use this template** on GitHub and create a private repository. Clone
+that private copy before adding personal information:
 
 ```bash
 git clone https://github.com/YOURUSERNAME/YOUR-PRIVATE-WEDDING-REPO.git
 cd YOUR-PRIVATE-WEDDING-REPO
 ```
 
-The `.gitignore` excludes known PII-bearing and generated files. Keep those
-rules in your private copy.
+Keep the included `.gitignore`. It excludes the common guest-data, raw-code,
+credential, and local database files used by this project.
 
 ## 2. Customize the frontend
 
-Replace the fictional values in these files:
+Replace the fictional values in the following files:
 
-| File | Update |
+| File | What to update |
 | --- | --- |
-| `site/index.html` | names, dates, location, photo captions |
-| `site/schedule/index.html` | event names, dates, times, descriptions |
-| `site/rsvp/index.html` | names, dates, RSVP copy |
-| `site/js/home.js` | `WEDDING_DATE` |
-| `site/js/rsvp.js` | `API_BASE`, `EVENT_META`, `EVENT_ORDER`, demo data |
-| `site/dashboard/index.html` | `API_BASE`, `PUBLIC_RSVP_URL`, event/source labels, SMS copy |
-| `worker/src/index.ts` | matching allowed event keys and optional source labels |
-| `worker/wrangler.toml` | Worker name, D1 ID, allowed origins, date |
+| `site/index.html` | Names, dates, location, captions, and page metadata |
+| `site/schedule/index.html` | Event names, dates, times, and descriptions |
+| `site/rsvp/index.html` | Names, dates, and RSVP copy |
+| `site/js/home.js` | `WEDDING_DATE` used by the countdown |
+| `site/js/rsvp.js` | Production `API_BASE`, events, labels, and demo data |
+| `site/dashboard/index.html` | Production URLs, events, source labels, SMS copy, and demo rows |
+| `worker/src/index.ts` | Matching event keys and optional source labels |
+| `worker/wrangler.toml` | Worker name, D1 ID, allowed origins, and wedding date |
 
-Replace the SVGs in `site/assets/` with your own licensed artwork and photos, or
-remove the corresponding image elements. Do not commit private photos to the
-public template repository.
+Replace the files in `site/assets/` with appropriately licensed artwork and
+photos, or remove image elements you do not need. Keep private photos in the
+private wedding repository, never in the public template.
 
-Event keys must match in the frontend, dashboard, Worker, guest CSV, and D1
-records. The example keys are `welcome`, `ceremony`, and `farewell`. Source codes
-`A` and `B` are optional planning labels for the two sides of the guest list.
+Event keys must agree everywhere: the RSVP page, dashboard, Worker, guest CSV,
+and D1 records. This template uses `welcome`, `ceremony`, and `farewell`.
+Source codes `A` and `B` are optional labels for the two sides of a guest list.
 
-Preview the static site:
+## 3. Run the complete stack locally
 
-```bash
-python3 -m http.server 5050 --directory site
-```
-
-Open `http://localhost:5050/`. Use `http://localhost:5050/rsvp/?demo=1` to try
-the RSVP UI without a backend.
-
-## 3. Create and configure Cloudflare D1
-
-Install the Worker dependencies and authenticate:
+Install the Worker dependencies:
 
 ```bash
 cd worker
 npm install
-npx wrangler login
-npx wrangler d1 create your-wedding-rsvp
 ```
 
-Copy the returned database ID into `worker/wrangler.toml`. Keep the binding name
-as `DB`, then initialize the remote database:
+Create the ignored local secret file and choose a development-only PIN:
 
 ```bash
-npx wrangler d1 execute your-wedding-rsvp --remote --file=../schema.sql
+cp .dev.vars.example .dev.vars
 ```
 
-For local Worker development, initialize the local D1 database and run Wrangler:
+Edit `worker/.dev.vars`:
+
+```dotenv
+DASHBOARD_PIN=choose-a-local-only-pin
+```
+
+Initialize local D1 and start the Worker:
 
 ```bash
 npm run db:migrate:local
 npm run dev
 ```
 
-For a full local integration test, temporarily set `API_BASE` in
-`site/js/rsvp.js` and `site/dashboard/index.html` to `http://localhost:8787`.
-
-## 4. Protect and deploy the Worker
-
-Set a long, randomly generated dashboard credential as a Worker secret:
+In a second terminal, start the frontend from the repository root:
 
 ```bash
-npx wrangler secret put DASHBOARD_PIN
+python3 -m http.server 5050 --directory site
 ```
 
-Set `ALLOWED_ORIGINS` in `worker/wrangler.toml` to exact origins, without paths.
-For example:
+When the frontend hostname is `localhost` or `127.0.0.1`, the RSVP page and
+dashboard automatically use the local Worker at `http://localhost:8787`.
+Enter the PIN from `.dev.vars` to use the database-backed dashboard. Enter
+`demo` instead when you want the disposable sandbox.
+
+## 4. Create the production D1 database
+
+Authenticate and create the database:
+
+```bash
+cd worker
+npx wrangler login
+npx wrangler d1 create your-wedding-rsvp
+```
+
+Copy the returned database ID into `worker/wrangler.toml`:
+
+```toml
+[[d1_databases]]
+binding = "DB"
+database_name = "your-wedding-rsvp"
+database_id = "PASTE_THE_DATABASE_ID_HERE"
+```
+
+Create the tables and indexes:
+
+```bash
+npm run db:migrate:remote
+```
+
+## 5. Configure and deploy the Worker
+
+Set exact frontend origins in `worker/wrangler.toml`. Origins have no trailing
+path:
 
 ```toml
 [vars]
@@ -120,37 +236,50 @@ ALLOWED_ORIGINS = "https://YOURUSERNAME.github.io,http://localhost:5050"
 WEDDING_DATE = "2027-09-18"
 ```
 
-Deploy and copy the resulting Worker URL into both frontend `API_BASE` constants:
+Create a long, random production dashboard credential. Wrangler stores it as a
+secret; do not put it in source files:
+
+```bash
+npx wrangler secret put DASHBOARD_PIN
+```
+
+Type-check and deploy:
 
 ```bash
 npm run type-check
 npm run deploy
 ```
 
-Never put `DASHBOARD_PIN`, Cloudflare tokens, or Twilio credentials in source
-files or `wrangler.toml`.
+Copy the resulting `https://...workers.dev` URL into the production fallback
+for `API_BASE` in:
 
-## 5. Prepare and import guests
+- `site/js/rsvp.js`
+- `site/dashboard/index.html`
 
-Copy the fictional CSV and edit the ignored copy:
+Also update `PUBLIC_RSVP_URL` in `site/dashboard/index.html` so generated links
+point to the deployed RSVP page.
+
+## 6. Prepare and import guests
+
+Copy the fictional CSV into the ignored working filename:
 
 ```bash
 cp scripts/guests.csv.example scripts/guests.csv
 ```
 
-CSV columns:
+Use one row per guest:
 
-```text
+```csv
 household_label,phone_e164,guest_name,events,source_list
+"Example Family",+15550101001,"Alex Guest",welcome|ceremony|farewell,A
 ```
 
-- Use one row per guest.
-- Reuse the same E.164 phone number to group guests into one household.
+- Use E.164 phone numbers, including the country code.
+- Reuse the same phone number to group guests into one household.
 - Separate multiple event keys with `|`.
 - Use source `A` or `B`, or leave it blank.
 
-Generate invite codes and import SQL. Pass the public RSVP page—not the home
-page—as the base URL:
+Generate household codes and import SQL from the repository root:
 
 ```bash
 node scripts/generate_tokens.mjs \
@@ -162,18 +291,38 @@ cd worker
 npx wrangler d1 execute your-wedding-rsvp --remote --file=../scripts/seed.sql
 ```
 
-Generated files contain guest PII or usable invitation credentials and are
-ignored by Git:
+The generated files are ignored because they contain private or usable data:
 
-- `scripts/import.csv`: names, phone numbers, and token hashes
-- `scripts/sms.csv`: names, phone numbers, raw invite codes, and RSVP URLs
-- `scripts/seed.sql`: database seed data
+| File | Contents |
+| --- | --- |
+| `scripts/import.csv` | Names, phone numbers, and token hashes |
+| `scripts/sms.csv` | Names, phone numbers, raw invite codes, and RSVP URLs |
+| `scripts/seed.sql` | D1 seed data |
 
-Back them up securely. The raw invite codes cannot be recovered from D1.
+Store them securely. Raw invite codes cannot be recovered from the hashes in
+D1.
 
-## 6. Optional: send invitation texts with Twilio
+To seed the local database instead, replace `--remote` with `--local` in the
+final command.
 
-First edit `buildMessage()` in `scripts/send_sms_twilio.mjs`. Then:
+## 7. Publish the frontend with GitHub Pages
+
+The included workflow publishes only `site/` and runs manually.
+
+1. Push the customized private repository to GitHub.
+2. Open **Settings → Pages**.
+3. Set **Source** to **GitHub Actions**.
+4. Run **Deploy frontend to GitHub Pages** from the Actions tab.
+5. Add the final Pages origin to `ALLOWED_ORIGINS`.
+6. Confirm `API_BASE` and `PUBLIC_RSVP_URL`, then redeploy the Worker.
+
+The dashboard lives at `/dashboard/`. An unlisted URL is not access control;
+live dashboard data is protected by `DASHBOARD_PIN` in the Worker.
+
+## 8. Optional Twilio invitations
+
+Edit `buildMessage()` in `scripts/send_sms_twilio.mjs`, then install the script
+dependency and run a dry run:
 
 ```bash
 cd scripts
@@ -187,24 +336,31 @@ node send_sms_twilio.mjs --confirm --to=+15550001234
 node send_sms_twilio.mjs --confirm
 ```
 
-Use a Twilio Messaging Service instead of `TWILIO_FROM` by setting
-`TWILIO_MESSAGING_SERVICE_SID`. Review applicable consent and messaging rules
-before contacting guests.
+Set `TWILIO_MESSAGING_SERVICE_SID` instead of `TWILIO_FROM` when using a Twilio
+Messaging Service. Review consent and messaging requirements before contacting
+guests.
 
-## 7. Publish the frontend with GitHub Pages
+## Troubleshooting
 
-The included workflow publishes only `site/`.
+### The dashboard says “Failed to connect”
 
-1. Push the private customized repository to GitHub.
-2. Open **Settings → Pages**.
-3. Set **Source** to **GitHub Actions**.
-4. Run the “Deploy frontend to GitHub Pages” workflow.
-5. Add the resulting origin to `ALLOWED_ORIGINS`, update `PUBLIC_RSVP_URL`, and
-   redeploy the Worker.
+- For the no-backend preview, use `/dashboard/?demo=1` or enter `demo`.
+- For live local data, confirm Wrangler is running on port `8787`.
+- Confirm `DASHBOARD_PIN` exists in `worker/.dev.vars`.
+- Confirm `http://localhost:5050` is listed in `ALLOWED_ORIGINS`.
+- For production, confirm both frontend files use the deployed Worker URL.
 
-The dashboard lives at `/dashboard/`. It is hidden from navigation but is not
-secret merely because the URL is unlisted; the Worker credential is the access
-control.
+### An invite code is not found
+
+- Confirm the raw code came from the latest `scripts/sms.csv`.
+- Confirm `seed.sql` was imported into the intended local or remote database.
+- Regenerated codes invalidate the previous household code.
+
+### Dashboard totals look unexpected
+
+- Confirm event keys match across every configuration file.
+- Check whether a source filter or event chip is active.
+- Remember that pending means a guest has no submitted response.
 
 ## Privacy checklist before every push
 
@@ -215,10 +371,16 @@ rg -n -i "phone|token|address|@|workers\\.dev" . \
   -g '!node_modules/**' -g '!package-lock.json'
 ```
 
-Confirm that only the fictional example CSV is tracked, no real media is
-present, all deployment IDs are placeholders, and no generated guest files were
-ever committed. If PII enters Git history, removing the current file is not
-enough; rewrite the history or create a fresh repository before making it public.
+Confirm that:
+
+- Only fictional example CSV data is tracked.
+- No private photos or invitation artwork are tracked publicly.
+- Deployment IDs and URLs are placeholders in the public template.
+- `.dev.vars`, generated guest files, and raw invite codes are ignored.
+- No real guest information ever entered the public Git history.
+
+If private information enters Git history, deleting the current file is not
+enough. Rewrite the history or create a fresh repository before publishing.
 
 See [SECURITY.md](SECURITY.md) for deployment-specific guidance.
 
