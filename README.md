@@ -246,6 +246,9 @@ Create the tables and indexes:
 npm run db:migrate:remote
 ```
 
+The included migration scripts use the stable `DB` binding, so they continue
+to work when a forker chooses a different database name.
+
 ### Optional: migrate from an existing D1 database
 
 Forkers who already have a guest list in Cloudflare D1 can migrate it instead
@@ -365,7 +368,7 @@ node scripts/generate_tokens.mjs \
 
 node scripts/import_to_d1.mjs --output=scripts/seed.sql
 cd worker
-npx wrangler d1 execute your-wedding-rsvp --remote --file=../scripts/seed.sql
+npx wrangler d1 execute DB --remote --file=../scripts/seed.sql
 ```
 
 > **Do not run the same seed twice against the same database.** Invite rows are
@@ -395,13 +398,13 @@ counts and integrity problems, not guest contact details:
 
 ```bash
 cd worker
-npx wrangler d1 execute your-wedding-rsvp --remote --command \
+npx wrangler d1 execute DB --remote --command \
   "SELECT COUNT(*) AS households FROM invites; SELECT COUNT(*) AS guests FROM guests; SELECT COUNT(*) AS responses FROM rsvps;"
 
-npx wrangler d1 execute your-wedding-rsvp --remote --command \
+npx wrangler d1 execute DB --remote --command \
   "SELECT COUNT(*) AS orphan_guests FROM guests g LEFT JOIN invites i ON i.id = g.invite_id WHERE i.id IS NULL; SELECT COUNT(*) AS orphan_responses FROM rsvps r LEFT JOIN guests g ON g.id = r.guest_id WHERE g.id IS NULL;"
 
-npx wrangler d1 execute your-wedding-rsvp --remote --command \
+npx wrangler d1 execute DB --remote --command \
   "SELECT COUNT(*) AS duplicate_phones FROM (SELECT phone_e164 FROM invites GROUP BY phone_e164 HAVING COUNT(*) > 1); SELECT COUNT(*) AS duplicate_guest_rows FROM (SELECT invite_id, full_name FROM guests GROUP BY invite_id, full_name HAVING COUNT(*) > 1);"
 ```
 

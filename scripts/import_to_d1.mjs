@@ -17,10 +17,10 @@
  *
  *   # Execute directly against local D1 (from worker/ directory)
  *   node ../scripts/import_to_d1.mjs --output=../scripts/seed.sql
- *   cd worker && wrangler d1 execute your-wedding-rsvp --local --file=../scripts/seed.sql
+ *   cd worker && wrangler d1 execute DB --local --file=../scripts/seed.sql
  *
  *   # Execute against remote D1
- *   cd worker && wrangler d1 execute your-wedding-rsvp --remote --file=../scripts/seed.sql
+ *   cd worker && wrangler d1 execute DB --remote --file=../scripts/seed.sql
  */
 
 import { createReadStream, existsSync, writeFileSync } from 'node:fs';
@@ -148,9 +148,9 @@ async function main() {
     console.log(`\n💾  SQL written to: ${outPath}`);
     console.log('\nTo apply locally:');
     console.log('  cd worker');
-    console.log(`  wrangler d1 execute your-wedding-rsvp --local --file=../${args.output}`);
+    console.log(`  wrangler d1 execute DB --local --file=../${args.output}`);
     console.log('\nTo apply to remote D1:');
-    console.log(`  wrangler d1 execute your-wedding-rsvp --remote --file=../${args.output}\n`);
+    console.log(`  wrangler d1 execute DB --remote --file=../${args.output}\n`);
   } else {
     console.log(sql);
   }
